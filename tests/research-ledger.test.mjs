@@ -1,0 +1,6 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {emptyResearchLedger,enroll,resolveProbe,scheduleProbe,validateLedger} from "../src/research/ledger.ts";
+
+test("research enrollment is deterministic and idempotent",()=>{const definition={id:"spacing-v1",arms:[{id:"control",weight:1},{id:"spacing",weight:1}]};const once=enroll(emptyResearchLedger(),definition,"1.0.0","concept:linear",new Date("2026-01-01")),twice=enroll(once,definition,"1.0.0","concept:linear",new Date("2026-01-02"));assert.deepEqual(twice,once);assert.equal(once.enrollments.length,1)});
+test("only eligible delayed probes become outcomes",()=>{const probe={experimentId:"spacing-v1",armId:"spacing",conceptId:"linear",createdAt:"2026-01-01T00:00:00.000Z",eligibleAfter:"2026-01-08T00:00:00.000Z",baselineMastery:.5};const ledger=scheduleProbe(emptyResearchLedger(),probe),outcome={learnerId:"local",armId:"spacing",observedAt:"2026-01-08T00:00:00.000Z",retention:.8,accuracy:1,meanSolveTimeMs:45000,confidenceCalibration:.9,mastery:.7};assert.throws(()=>resolveProbe(ledger,"spacing-v1","linear",outcome,new Date("2026-01-02")),/No eligible/);const resolved=resolveProbe(ledger,"spacing-v1","linear",outcome,new Date("2026-01-08"));assert.equal(resolved.pending.length,0);assert.equal(resolved.outcomes.length,1);assert.equal(validateLedger(resolved).valid,true)});

@@ -1,0 +1,4 @@
+import type {Concept} from "@/core/concepts"; import type {ProbabilisticMastery} from "@/core/types";
+const clamp=(x:number)=>Math.max(0,Math.min(1,x));
+export function graphRelations(nodes:Concept[]){const children:Record<string,string[]>={};for(const n of nodes)for(const p of n.prerequisites)(children[p]??=[]).push(n.id);return children}
+export function propagate(states:Record<string,ProbabilisticMastery>,concepts:Concept[],changedId:string,delta:number){const out={...states},node=concepts.find(c=>c.id===changedId);if(!node)return out;const children=graphRelations(concepts);for(const id of node.prerequisites){const s=out[id];if(s)out[id]={...s,mean:clamp(s.mean+delta*.08),variance:Math.min(.12,s.variance+.002)}}for(const id of children[changedId]??[]){const s=out[id];if(s)out[id]={...s,mean:clamp(s.mean+delta*.05),variance:Math.min(.12,s.variance+.003)}}return out}
