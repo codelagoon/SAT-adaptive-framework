@@ -69,7 +69,12 @@ export async function hydrate(): Promise<State> {
 	return load();
 }
 export function save(s: State) {
-	localStorage.setItem(KEY, JSON.stringify(s));
+	try {
+		localStorage.setItem(KEY, JSON.stringify(s));
+	} catch {
+		// Large authorized question libraries can exceed the synchronous
+		// localStorage quota; IndexedDB remains the durable source of truth.
+	}
 	void writeSnapshot(s);
 }
 export function exportProgress(s: State) {
