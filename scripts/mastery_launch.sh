@@ -16,6 +16,7 @@ NODE_BIN="$(cat "${NODE_FILE}")"
 [[ -x "${NODE_BIN}" ]] || { echo "${FAIL}: Node executable has moved; re-run installer" >&2;exit 1; }
 export PATH="$(dirname "${NODE_BIN}"):${API_DIR}/.venv/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
 export PYTHONUNBUFFERED=1 NEXT_TELEMETRY_DISABLED=1
+export NO_PROXY="127.0.0.1,localhost" no_proxy="127.0.0.1,localhost"
 # Load optional user configuration without executing .env as shell code.
 # Python dotenv is already installed by requirements-core.txt. Values can
 # contain spaces/quotes/metacharacters without becoming shell expressions.
