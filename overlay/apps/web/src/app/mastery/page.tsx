@@ -52,6 +52,7 @@ export default function MasteryPage(){
   const [help,setHelp]=useState<OfflineHelp|null>(null);
   const [helpMode,setHelpMode]=useState<"hint"|"lesson">("hint");
   const [helpBusy,setHelpBusy]=useState(false);
+  const [usedAssistance,setUsedAssistance]=useState(false);
   const [bank,setBank]=useState<BankStatus|null>(null);
   const [focusSkill,setFocusSkill]=useState("");
   const [practiceMode,setPracticeMode]=useState<"challenge"|"repair"|"review">("challenge");
@@ -69,7 +70,7 @@ export default function MasteryPage(){
   useEffect(()=>{listCourseOverview().then(rows=>{setCourses(rows);if(rows.length)setCourseId(rows[0].id)}).catch(e=>setError(String(e)))},[]);
   const refresh=useCallback(async (id:string)=>{
     if(!id)return;
-    setLoading(true);setError("");setAnswer("");setThinking("");setGrade(null);setDiagnosis(null);setProbeAnswer("");setProbeResult(null);setTutorAnswer("");setHelp(null);
+    setLoading(true);setError("");setAnswer("");setThinking("");setGrade(null);setDiagnosis(null);setProbeAnswer("");setProbeResult(null);setTutorAnswer("");setHelp(null);setUsedAssistance(false);
     try{
       const [state,next,priorities,claims,bankResult]=await Promise.all([
         request<Overview>(`/mastery/courses/${id}/overview`),
@@ -94,7 +95,7 @@ export default function MasteryPage(){
     try{
       await request('/mastery/prepare',{method:'POST',body:JSON.stringify({
         course_id:courseId,problem_id:question.id,confidence,reasoning:thinking.trim(),
-        mode:question.effective_mode??practiceMode
+        mode:question.effective_mode??practiceMode,assisted:usedAssistance
       })});
       const result=await request<Grade>('/quiz/submit',{method:'POST',body:JSON.stringify({
         problem_id:question.id,user_answer:response,answer_time_ms:Math.max(1,Date.now()-started.current)
@@ -154,6 +155,7 @@ export default function MasteryPage(){
   async function getOfflineHelp(mode:"hint"|"lesson"){
     if(!question||!courseId||helpBusy)return;
     setHelpMode(mode);
+    setUsedAssistance(true);
     if(help)return;
     setHelpBusy(true);
     try {setHelp(await request<OfflineHelp>(`/mastery/courses/${courseId}/offline-help/${question.id}`));}

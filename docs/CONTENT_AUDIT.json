@@ -1,0 +1,152 @@
+{
+  "scope": "Original, unofficial offline practice engine",
+  "interpretation": "Parameter changes are NOT independent content authoring; numbers are not official calibrated exam-question counts.",
+  "human_editorial_review": "not performed; required for release",
+  "license_verification": "original items only; any external sources must be checked separately",
+  "tracks": {
+    "SAT Math": {
+      "generated_items_before_app_deduplication": 3360,
+      "unique_question_hashes": 2886,
+      "actual_app_eligible_after_deduplication": 2886,
+      "question_hash_metadata_present": true,
+      "technical_audit": {
+        "raw_duplicates_or_defects": 474,
+        "structurally_valid": 2886,
+        "structurally_invalid": 0,
+        "first_failures": [],
+        "distinct_problem_families": 32
+      },
+      "curriculum": {
+        "missing_lessons": [],
+        "unmapped_skills": [],
+        "available_skills": 21
+      }
+    },
+    "SAT Reading & Writing": {
+      "generated_items_before_app_deduplication": 3462,
+      "unique_question_hashes": 1245,
+      "actual_app_eligible_after_deduplication": 1245,
+      "question_hash_metadata_present": true,
+      "technical_audit": {
+        "raw_duplicates_or_defects": 2217,
+        "structurally_valid": 1245,
+        "structurally_invalid": 0,
+        "first_failures": [],
+        "distinct_problem_families": 9
+      },
+      "curriculum": {
+        "missing_lessons": [],
+        "unmapped_skills": [],
+        "available_skills": 18
+      }
+    },
+    "ACT English": {
+      "generated_items_before_app_deduplication": 3400,
+      "unique_question_hashes": 1181,
+      "actual_app_eligible_after_deduplication": 1181,
+      "question_hash_metadata_present": true,
+      "technical_audit": {
+        "raw_duplicates_or_defects": 2219,
+        "structurally_valid": 1181,
+        "structurally_invalid": 0,
+        "first_failures": [],
+        "distinct_problem_families": 9
+      },
+      "curriculum": {
+        "missing_lessons": [],
+        "unmapped_skills": [],
+        "available_skills": 11
+      }
+    },
+    "ACT Math": {
+      "generated_items_before_app_deduplication": 3360,
+      "unique_question_hashes": 2871,
+      "actual_app_eligible_after_deduplication": 2871,
+      "question_hash_metadata_present": true,
+      "technical_audit": {
+        "raw_duplicates_or_defects": 489,
+        "structurally_valid": 2871,
+        "structurally_invalid": 0,
+        "first_failures": [],
+        "distinct_problem_families": 26
+      },
+      "curriculum": {
+        "missing_lessons": [],
+        "unmapped_skills": [],
+        "available_skills": 16
+      }
+    },
+    "ACT Reading": {
+      "generated_items_before_app_deduplication": 62,
+      "unique_question_hashes": 62,
+      "actual_app_eligible_after_deduplication": 62,
+      "question_hash_metadata_present": true,
+      "technical_audit": {
+        "raw_duplicates_or_defects": 0,
+        "structurally_valid": 62,
+        "structurally_invalid": 0,
+        "first_failures": [],
+        "distinct_problem_families": 1
+      },
+      "curriculum": {
+        "missing_lessons": [],
+        "unmapped_skills": [],
+        "available_skills": 7
+      }
+    },
+    "ACT Science": {
+      "generated_items_before_app_deduplication": 3360,
+      "unique_question_hashes": 3015,
+      "actual_app_eligible_after_deduplication": 3015,
+      "question_hash_metadata_present": true,
+      "technical_audit": {
+        "raw_duplicates_or_defects": 345,
+        "structurally_valid": 3015,
+        "structurally_invalid": 0,
+        "first_failures": [],
+        "distinct_problem_families": 14
+      },
+      "curriculum": {
+        "missing_lessons": [],
+        "unmapped_skills": [],
+        "available_skills": 7
+      }
+    },
+    "Algebra 2": {
+      "generated_items_before_app_deduplication": 3360,
+      "unique_question_hashes": 2878,
+      "actual_app_eligible_after_deduplication": 2878,
+      "question_hash_metadata_present": true,
+      "technical_audit": {
+        "raw_duplicates_or_defects": 482,
+        "structurally_valid": 2878,
+        "structurally_invalid": 0,
+        "first_failures": [],
+        "distinct_problem_families": 22
+      },
+      "curriculum": {
+        "missing_lessons": [],
+        "unmapped_skills": [],
+        "available_skills": 15
+      }
+    },
+    "Physics": {
+      "generated_items_before_app_deduplication": 3360,
+      "unique_question_hashes": 2128,
+      "actual_app_eligible_after_deduplication": 2128,
+      "question_hash_metadata_present": true,
+      "technical_audit": {
+        "raw_duplicates_or_defects": 1232,
+        "structurally_valid": 2128,
+        "structurally_invalid": 0,
+        "first_failures": [],
+        "distinct_problem_families": 17
+      },
+      "curriculum": {
+        "missing_lessons": [],
+        "unmapped_skills": [],
+        "available_skills": 8
+      }
+    }
+  }
+}
