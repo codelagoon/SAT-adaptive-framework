@@ -31,6 +31,19 @@ RESPONSE_ID_ANCHOR='    return AnswerResponse(\n        is_correct=is_correct,'
 RESPONSE_ID_PATCH='    return AnswerResponse(\n        result_id=str(pr.id),\n        is_correct=is_correct,'
 CLASSIFIER_ANCHOR='    if not is_correct and problem.correct_answer:\n        try:'
 CLASSIFIER_PATCH='    if not is_correct and problem.correct_answer and problem.source != "mastery_offline":\n        try:'
+WEB_COURSE_ANCHOR='''        {
+          source: "/api/:path*",
+          destination: `${API_URL}/:path*`,
+        },'''
+WEB_COURSE_PATCH='''        {
+          source: "/api/courses",
+          destination: `${API_URL}/courses/`,
+        },
+        {
+          source: "/api/courses/",
+          destination: `${API_URL}/courses/`,
+        },
+'''+WEB_COURSE_ANCHOR
 SIDEBAR_ANCHOR='''        <button
           type="button"
           onClick={() => onNavigate("/settings")}
@@ -92,6 +105,7 @@ def apply(target:Path):
         ('apps/api/schemas/quiz.py',RESPONSE_SCHEMA_ANCHOR,RESPONSE_SCHEMA_PATCH),
         ('apps/api/routers/quiz_submission.py',RESPONSE_ID_ANCHOR,RESPONSE_ID_PATCH),
         ('apps/web/src/app/_components/dashboard-sidebar.tsx',SIDEBAR_ANCHOR,SIDEBAR_PATCH),
+        ('apps/web/next.config.ts',WEB_COURSE_ANCHOR,WEB_COURSE_PATCH),
         ('apps/web/src/app/layout.tsx',FONT_IMPORT,''),
         ('apps/web/src/app/layout.tsx',FONT_CONFIG,''),
         ('apps/web/src/app/layout.tsx',FONT_CLASS,'className="font-sans"'),
