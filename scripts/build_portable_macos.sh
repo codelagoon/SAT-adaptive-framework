@@ -112,7 +112,7 @@ cat > "${APP}/Contents/Info.plist" <<'PLIST'
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict></plist>
 PLIST
-xcrun swiftc -O -target arm64-apple-macos13 -framework Cocoa -framework WebKit \
+xcrun swiftc -parse-as-library -O -target arm64-apple-macos13 -framework Cocoa -framework WebKit \
   "${BUILD_DIR}/MasteryPortable.swift" -o "${APP}/Contents/MacOS/MasteryEngine2"
 chmod +x "${APP}/Contents/MacOS/MasteryEngine2"
 # Ad-hoc signing is NOT Apple notarization: Gatekeeper may still require Open Anyway.
