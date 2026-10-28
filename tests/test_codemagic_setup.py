@@ -18,7 +18,7 @@ class CodemagicConfiguration(unittest.TestCase):
     def test_live_smoke_checks_real_services_and_dmg(self):
         script = ROOT/'scripts/codemagic_smoke.sh'
         subprocess.run(['bash','-n',str(script)], check=True)
-        src = script.read_text()
+        src = script.read_text() + (ROOT/'scripts/verify_bundled_runtime.py').read_text()
         for needle in ('/api/health','/api/mastery/health','/quiz/submit','/courses/','/mastery/prepare','hdiutil attach','codesign --verify'):
             assert needle in src
         assert 'mock' not in src.lower()

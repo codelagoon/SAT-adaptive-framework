@@ -41,10 +41,10 @@ class StrictPreflight(unittest.TestCase):
         self.assertIn('lipo -archs', text)
 
     def test_real_ui_diagnosis_and_data_deletion_checked(self):
-        text = SMOKE.read_text()
+        text = SMOKE.read_text() + (ROOT/'scripts/verify_bundled_runtime.py').read_text()
         for needle in ("/mastery'", "Learn where it gets difficult",
                        "/offline-diagnosis/", "diagnostic_probes",
-                       "COUNT(*)", "hdiutil attach", "codesign --verify"):
+                       "SELECT * FROM", "hdiutil attach", "codesign --verify"):
             self.assertIn(needle, text)
         subprocess.run(["bash", "-n", str(SMOKE)], check=True)
 

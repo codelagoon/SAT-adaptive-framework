@@ -24,46 +24,7 @@ jobs:
       - name: Build portable app and DMG
         run: bash scripts/build_portable_macos.sh
       - name: Smoke test bundled runtime (no system Python or Node)
-        run: |
-          set -euo pipefail
-          RES="${GITHUB_WORKSPACE}/build/Mastery Engine 2.app/Contents/Resources"
-          bash "$RES/mastery_launch.sh" "$RES/opentutor" "$RES" > "${RUNNER_TEMP}/mastery-start.log" 2>&1 &
-          APP_PID=$!
-          trap 'kill "$APP_PID" 2>/dev/null || true' EXIT
-          for i in {1..120}; do
-            if ! kill -0 "$APP_PID" 2>/dev/null; then
-              cat "${RUNNER_TEMP}/mastery-start.log"; exit 1
-            fi
-            if curl -fsS --max-time 2 http://127.0.0.1:18766/api/mastery/health | grep -q '"status":"ok"'; then
-              break
-            fi
-            sleep 1
-          done
-          curl -fsS --max-time 5 http://127.0.0.1:18766/api/mastery/health | grep -q '"status":"ok"'
-          PATH='/usr/bin:/bin' "$RES/python/bin/python3.11" - <<'PY'
-          import json, urllib.request, uuid
-          base='http://127.0.0.1:18766/api'
-          def call(path,method='GET',body=None):
-              data=json.dumps(body).encode() if body is not None else None
-              req=urllib.request.Request(base+path,data=data,method=method,headers={'Content-Type':'application/json'})
-              with urllib.request.urlopen(req,timeout=15) as r:
-                  raw=r.read();return json.loads(raw) if raw else None
-          course=None
-          try:
-              course=call('/courses/','POST',{'name':'Portable smoke '+uuid.uuid4().hex[:8], 'description':'temporary smoke course', 'metadata':{'mastery_track':'SAT Math'}})['id']
-              seeded=call(f'/mastery/courses/{course}/starter-questions','POST')
-              assert seeded['added']>=100,seeded
-              q=call(f'/mastery/courses/{course}/next')['question']
-              assert q and q['options'] and 'correct_answer' not in q
-              call('/mastery/prepare','POST',{'course_id':course,'problem_id':q['id'],'confidence':2,'reasoning':'CI verification','mode':'challenge'})
-              result=call('/quiz/submit','POST',{'problem_id':q['id'],'user_answer':'Z','answer_time_ms':1800})
-              assert result['is_correct'] is False and result.get('result_id'),result
-              state=call(f'/mastery/courses/{course}/overview')
-              assert state['recent_errors'] and state['skills'],state
-              print('PASS: real OpenTutor/Next runtimes, offline bank, grading, mastery persistence')
-          finally:
-              if course:call(f'/courses/{course}','DELETE')
-          PY
+        run: bash scripts/codemagic_smoke.sh
       - name: Upload installable DMG artifact
         uses: actions/upload-artifact@v4
         with:
@@ -76,5 +37,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: MasteryEngine2-Build-Logs
-          path: ${{ runner.temp }}/mastery-start.log
+          path: ${{ runner.temp }}/mastery-codemagic-smoke.log
           if-no-files-found: ignore

@@ -1,100 +1,97 @@
 #!/bin/bash
-# Run only on the Apple Silicon CI builder, against the actual packaged runtimes.
+# Shared Apple Silicon release gate, used by GitHub Actions and Codemagic.
 set -euo pipefail
 SOURCE="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$SOURCE/build/Mastery Engine 2.app"
-RES="$APP/Contents/Resources"
 DMG="$SOURCE/dist/MasteryEngine2-AppleSilicon-Standalone.dmg"
-PORT1=18765; PORT2=18766
-[[ -x "$APP/Contents/MacOS/MasteryEngine2" && -x "$RES/node" && -x "$RES/python/bin/python3.11" && -s "$DMG" ]] || {
-  echo 'Missing compiled native app, bundled runtimes, or DMG' >&2; exit 1;
+[[ "$(uname -s)" == Darwin && "$(uname -m)" == arm64 && -s "$DMG" ]] || {
+  echo 'Requires Apple Silicon macOS and a built standalone DMG' >&2; exit 1;
 }
-[[ -f "$RES/opentutor/apps/web/.next/BUILD_ID" ]] || { echo 'Production web assets missing' >&2; exit 1; }
-[[ -f "$RES/opentutor/apps/api/mastery_ext/router.py" ]] || { echo 'Mastery extension missing' >&2; exit 1; }
-LOG="${CM_BUILD_DIR:-${RUNNER_TEMP:-/tmp}}/mastery-codemagic-smoke.log"
-# Health test deliberately avoids relying on system Node/Python.
-export PATH='/usr/bin:/bin:/usr/sbin:/sbin'
-"$RES/python/bin/python3.11" -c 'import sys; assert sys.version_info[:2] == (3,11)'
-"$RES/node" -e 'if (process.arch !== "arm64") process.exit(1)'
-bash "$RES/mastery_launch.sh" "$RES/opentutor" "$RES" >"$LOG" 2>&1 &
-PID=$!
+LOG_DIR="${CM_BUILD_DIR:-${RUNNER_TEMP:-${TMPDIR:-/tmp}}}"
+LOG="$LOG_DIR/mastery-codemagic-smoke.log"
+SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/mastery-release-smoke.XXXXXX")"
+MOUNT_DIR="$SCRATCH/mounted"
+mkdir -p "$MOUNT_DIR" "$SCRATCH/data"
+export MASTERY_DATA_DIR="$SCRATCH/data"
+touch "$MASTERY_DATA_DIR/.release-smoke"
+PID=''
 cleanup() {
-  if [[ -n "${PID:-}" ]]; then
-    # Kill the process group via launcher cleanup trap; best-effort fallback.
+  trap - EXIT INT TERM
+  if [[ -n "$PID" ]]; then
     kill "$PID" 2>/dev/null || true
     wait "$PID" 2>/dev/null || true
   fi
+  hdiutil detach "$MOUNT_DIR" -quiet >/dev/null 2>&1 || true
+  # These paths belong to this run; never touch the learner's Library data.
+  rm -rf "$SCRATCH"
 }
-trap cleanup EXIT INT TERM
-READY=0
-for i in {1..120}; do
-  if ! kill -0 "$PID" 2>/dev/null; then cat "$LOG" >&2; echo 'Bundled app exited during startup' >&2; exit 1; fi
-  if curl --noproxy '*' -fsS --max-time 2 'http://127.0.0.1:18765/api/health' >/dev/null 2>&1 &&
-     curl --noproxy '*' -fsS --max-time 2 'http://127.0.0.1:18766/api/mastery/health' | grep -q '"status":"ok"'; then
-    READY=1; break
-  fi
-  sleep 1
-done
-if [[ "$READY" != 1 ]]; then cat "$LOG" >&2; echo 'Bundled API/UI readiness timed out' >&2; exit 1; fi
-# Smoke the learner UI itself, not merely the health endpoint.
-PAGE="$(mktemp)"
-trap 'rm -f "$PAGE"; cleanup' EXIT INT TERM
-curl --noproxy '*' -fsS --max-time 20 'http://127.0.0.1:18766/mastery' > "$PAGE"
-grep -q 'Learn where it gets difficult' "$PAGE" || {
-  cat "$LOG" >&2
-  echo 'Mastery learner UI failed to render on bundled Next server' >&2
-  exit 1
-}
-"$RES/python/bin/python3.11" - <<'PY'
-import json, urllib.request, uuid
-base = 'http://127.0.0.1:18766/api'
-def call(path, method='GET', body=None):
-    data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(base + path, data=data, method=method,
-                                 headers={'Content-Type': 'application/json'})
-    with urllib.request.urlopen(req, timeout=30) as response:
-        raw = response.read()
-        return json.loads(raw) if raw else None
-course = None
-try:
-    course = call('/courses/', 'POST', {
-        'name': 'Codemagic smoke ' + uuid.uuid4().hex[:10],
-        'description': 'Temporary verification course',
-        'metadata': {'mastery_track': 'SAT Math'}
-    })['id']
-    seeded = call(f'/mastery/courses/{course}/starter-questions', 'POST')
-    assert seeded['added'] >= 100, seeded
-    next_item = call(f'/mastery/courses/{course}/next')['question']
-    assert next_item and next_item['options'] and 'correct_answer' not in next_item
-    call('/mastery/prepare', 'POST', {
-        'course_id': course, 'problem_id': next_item['id'],
-        'confidence': 2, 'reasoning': 'Codemagic end-to-end test', 'mode': 'challenge'
-    })
-    graded = call('/quiz/submit', 'POST', {
-        'problem_id': next_item['id'], 'user_answer': 'Z', 'answer_time_ms': 1800
-    })
-    assert graded['is_correct'] is False and graded.get('result_id'), graded
-    diagnosis = call(f'/mastery/courses/{course}/offline-diagnosis/{next_item["id"]}?attempt_id={graded["result_id"]}')
-    assert diagnosis['correct'] is False, diagnosis
-    overview = call(f'/mastery/courses/{course}/overview')
-    assert overview['recent_errors'] and overview['skills'], overview
-    print('PASS: real OpenTutor, bundled Python/Node, local study, grading and mastery history')
-finally:
-    if course is not None:
-        call(f'/courses/{course}', 'DELETE')
-        import sqlite3, pathlib
-        dbfile = pathlib.Path.home() / 'Library/Application Support/MasteryEngine2/mastery.sqlite3'
-        if dbfile.is_file():
-            with sqlite3.connect(dbfile) as conn:
-                for table in ('attempts','mastery','edges','propositions','diagnostic_probes','learning_queue'):
-                    count=conn.execute(f'SELECT COUNT(*) FROM {table} WHERE course_id=?',(course,)).fetchone()[0]
-                    assert count == 0, (table,count)
-print('PASS: temporary learning course deleted and extension data purged')
-PY
-# Ensure the DMG mountable on the actual macOS host, without touching /Applications.
-MOUNT_DIR="$(mktemp -d /tmp/mastery-codemagic-mount.XXXXXX)"
-trap 'hdiutil detach "$MOUNT_DIR" -quiet >/dev/null 2>&1 || true; rmdir "$MOUNT_DIR" 2>/dev/null || true; cleanup' EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 hdiutil attach -quiet -nobrowse -readonly -mountpoint "$MOUNT_DIR" "$DMG"
-test -x "$MOUNT_DIR/Mastery Engine 2.app/Contents/MacOS/MasteryEngine2"
-/usr/bin/codesign --verify --deep --strict "$MOUNT_DIR/Mastery Engine 2.app"
-echo 'PASS: DMG mounts and contains an ad-hoc-signed native arm64 app'
+# Test an installed copy relocated from the DMG, not the builder's source app.
+APP="$SCRATCH/Installed Apps/Mastery Engine 2.app"
+mkdir -p "$(dirname "$APP")"
+ditto "$MOUNT_DIR/Mastery Engine 2.app" "$APP"
+/usr/bin/codesign --verify --deep --strict "$APP"
+RES="$APP/Contents/Resources"
+[[ -x "$APP/Contents/MacOS/MasteryEngine2" && -x "$RES/node" && -x "$RES/python/bin/python3.11" ]]
+lipo -archs "$APP/Contents/MacOS/MasteryEngine2" | grep -qw arm64
+[[ -f "$RES/opentutor/apps/web/.next/BUILD_ID" && -f "$RES/opentutor/apps/api/mastery_ext/router.py" ]]
+echo 'PASS: DMG mounts; relocated app has a verified ad-hoc signature and native arm64 executable'
+# Neither startup nor verification may resolve system Python, Node or Homebrew.
+export PATH='/usr/bin:/bin:/usr/sbin:/sbin'
+export HTTP_PROXY='http://127.0.0.1:9' HTTPS_PROXY='http://127.0.0.1:9'
+export http_proxy="$HTTP_PROXY" https_proxy="$HTTPS_PROXY"
+# Dead external proxies are a useful check, not OS-level network isolation.
+export NO_PROXY='127.0.0.1,localhost' no_proxy='127.0.0.1,localhost'
+"$RES/python/bin/python3.11" -c 'import sys; assert sys.version_info[:2] == (3,11)'
+"$RES/node" -e 'if (process.arch !== "arm64") process.exit(1)'
+start_services() {
+  bash "$RES/mastery_launch.sh" "$RES/opentutor" "$RES" >>"$LOG" 2>&1 &
+  PID=$!
+  for i in {1..120}; do
+    if ! kill -0 "$PID" 2>/dev/null; then cat "$LOG" >&2; return 1; fi
+    if curl --noproxy '*' -fsS --max-time 2 'http://127.0.0.1:18765/api/health' >/dev/null 2>&1 &&
+       curl --noproxy '*' -fsS --max-time 2 'http://127.0.0.1:18766/api/mastery/health' | grep -q '"status":"ok"'; then
+      return 0
+    fi
+    sleep 1
+  done
+  cat "$LOG" >&2
+  echo 'Bundled API/UI readiness timed out' >&2
+  return 1
+}
+stop_services() {
+  kill "$PID"
+  wait "$PID" || true
+  PID=''
+  "$RES/python/bin/python3.11" - <<'PY'
+import socket, time
+for _ in range(50):
+    occupied = []
+    for port in (18765, 18766):
+        with socket.socket() as sock:
+            sock.settimeout(.2)
+            if sock.connect_ex(('127.0.0.1', port)) == 0:
+                occupied.append(port)
+    if not occupied:
+        print('PASS: launcher termination leaves no API or web listeners')
+        break
+    time.sleep(.1)
+else:
+    raise RuntimeError(f'Child services leaked: {occupied}')
+PY
+}
+start_services
+curl --noproxy '*' -fsS --max-time 20 'http://127.0.0.1:18766/mastery' > "$SCRATCH/page.html"
+grep -q 'Learn where it gets difficult' "$SCRATCH/page.html" || {
+  echo 'Mastery learner UI failed to render on bundled Next server' >&2; exit 1;
+}
+"$RES/python/bin/python3.11" "$SOURCE/scripts/verify_bundled_runtime.py" exercise "$SCRATCH/state.json"
+stop_services
+start_services
+"$RES/python/bin/python3.11" "$SOURCE/scripts/verify_bundled_runtime.py" recover "$SCRATCH/state.json"
+"$RES/python/bin/python3.11" "$SOURCE/scripts/verify_bundled_runtime.py" cleanup "$SCRATCH/state.json"
+stop_services
+echo 'PASS: installed bundled runtime, restart recovery and course deletion isolation'
+echo 'NOT VERIFIED: physical network disconnection, Cocoa/WebKit interaction, Gatekeeper, notarization or updates'

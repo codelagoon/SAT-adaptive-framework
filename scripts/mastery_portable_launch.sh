@@ -12,7 +12,8 @@ FAIL='Mastery Engine startup failed'
 [[ -f "${WEB_DIR}/.next/BUILD_ID" ]] || { echo "${FAIL}: missing production frontend" >&2; exit 1; }
 [[ -f "${WEB_DIR}/node_modules/next/dist/bin/next" ]] || { echo "${FAIL}: missing bundled frontend dependencies" >&2; exit 1; }
 [[ -f "${API_DIR}/main.py" && -d "${API_DIR}/mastery_ext" ]] || { echo "${FAIL}: missing bundled API or Mastery integration" >&2; exit 1; }
-USER_DATA="${HOME}/Library/Application Support/MasteryEngine2"
+USER_DATA="${MASTERY_DATA_DIR:-${HOME}/Library/Application Support/MasteryEngine2}"
+[[ "${USER_DATA}" = /* ]] || { echo "${FAIL}: data directory must be absolute" >&2; exit 1; }
 mkdir -p "${USER_DATA}/uploads"
 export PATH="${RESOURCE_DIR}:${RESOURCE_DIR}/python/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export PYTHONPATH="${RESOURCE_DIR}/pylibs:${API_DIR}"

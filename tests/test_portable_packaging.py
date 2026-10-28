@@ -66,6 +66,7 @@ class PortablePackagingTest(unittest.TestCase):
         # Codemagic smoke script. Resolve that script before validating gates.
         if 'run: bash scripts/codemagic_smoke.sh' in text:
             text += (BASE/'scripts/codemagic_smoke.sh').read_text()
+            text += (BASE/'scripts/verify_bundled_runtime.py').read_text()
         self.assertIn('mastery_launch.sh',text)
         self.assertIn('mastery/prepare',text)
         self.assertIn('quiz/submit',text)
