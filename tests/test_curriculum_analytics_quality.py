@@ -242,3 +242,15 @@ def test_course_delete_clears_drafts_but_not_other_courses():
     with engine.connect() as db:
         assert workspace.saved_ids(db,'u','math')==set()
         assert workspace.saved_ids(db,'u','physics')=={'q1'}
+
+
+def test_draft_cleanup_does_not_implicitly_commit_grade_transaction():
+    from mastery_ext import workspace
+    with pytest.raises(RuntimeError):
+        with engine.connect() as db:
+            db.execute('''INSERT INTO saved_questions(user_id,course_id,problem_id,saved_at)
+                VALUES (?,?,?,?)''',('u','math','q2','2026-10-28T00:00:00+00:00'))
+            workspace.clear_draft(db,'u','math','q1')
+            raise RuntimeError('synthetic failure must roll back')
+    with engine.connect() as db:
+        assert workspace.saved_ids(db,'u','math')==set()
