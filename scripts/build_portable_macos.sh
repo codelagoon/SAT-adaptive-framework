@@ -57,6 +57,14 @@ rsync -a --exclude '.git/' --exclude '*.mastery-backup' --exclude '__pycache__/'
 cp -L "$(command -v node)" "${RES}/node"
 chmod +x "${RES}/node"
 file "${RES}/node" "${RES}/python/bin/python3.11"
+# Homebrew Node can dynamically link /opt/homebrew libraries not installed on
+# the user's Mac. Refuse to ship an apparently portable, actually broken DMG.
+if otool -L "${RES}/node" | tail -n +2 | awk '{print $1}' | grep -E '^(/opt/homebrew/|/usr/local/|/Users/|/opt/|@rpath/)'; then
+  echo 'Bundled Node depends on external libraries. Use an official standalone Node binary.' >&2
+  exit 1
+fi
+[[ "$(uname -m)" == arm64 ]] && lipo -archs "${RES}/node" | grep -q arm64
+# An outside package manager is not necessary on the destination Mac.
 
 # Adapt the existing Cocoa/WebKit desktop launcher to the bundled installation.
 "${RES}/python/bin/python3.11" - "${SOURCE_DIR}/macos/MasteryApp.swift" "${BUILD_DIR}/MasteryPortable.swift" <<'PY'
@@ -74,6 +82,16 @@ new='''        // Portable app: all dependencies are bundled in Contents/Resourc
         let script = resourceURL.appendingPathComponent("mastery_launch.sh")'''
 assert src.count(old)==1, 'Portable Swift launcher anchor changed'
 src=src.replace(old,new)
+# Do not resolve DeepTutor settings inside the signed (potentially read-only)
+# application bundle or inherit Homebrew executables on a clean M1 Mac.
+old_env='''        let installRoot = root.deletingLastPathComponent().path
+        env["DEEPTUTOR_HOME"] = "\(installRoot)/deeptutor-data"
+        let oldPath = env["PATH"] ?? "/usr/bin:/bin"
+        env["PATH"] = "\(installRoot)/deeptutor-venv/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:\(oldPath)"'''
+new_env='''        env["DEEPTUTOR_HOME"] = "\(home)/Library/Application Support/MasteryEngine2/deeptutor-data"
+        env["PATH"] = "\(resourceURL.path):\(resourceURL.path)/python/bin:/usr/bin:/bin:/usr/sbin:/sbin"'''
+assert src.count(old_env)==1, 'Portable Swift environment anchor changed'
+src=src.replace(old_env,new_env)
 Path(sys.argv[2]).write_text(src)
 PY
 cp "${SOURCE_DIR}/scripts/mastery_portable_launch.sh" "${RES}/mastery_launch.sh"
