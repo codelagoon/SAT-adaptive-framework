@@ -144,6 +144,7 @@ export default function MasteryPage(){
   }
   async function askTutor(){
     if(!tutorQuestion.trim()||!courseId)return;
+    if(question&&!grade)setUsedAssistance(true); // Tutor exposure is assistance for this attempt.
     setTutorBusy(true);setTutorAnswer("");setError("");
     try{
       const r=await request<{answer:string}>('/mastery/tutor',{method:'POST',body:JSON.stringify({
