@@ -1,4 +1,5 @@
-# Codemagic Apple Silicon workflow for Mastery Engine 2
+# Codemagic's YAML workflow runs on Apple's M2 Mac mini (also produces M1-compatible arm64 binaries).
+# This branch is deliberately manual-trigger-only; no Apple signing secrets are required.
 workflows:
   mastery-engine-macos:
     name: Mastery Engine 2 — standalone Apple Silicon DMG
@@ -10,17 +11,21 @@ workflows:
         NEXT_TELEMETRY_DISABLED: "1"
         UV_NO_PROGRESS: "1"
     scripts:
-      - name: Verify Mac tools and install uv
+      - name: Verify toolchain and install uv on the build machine
         script: |
           set -euo pipefail
           test "$(uname -s)" = Darwin && test "$(uname -m)" = arm64
           for command in node npm git xcrun swiftc codesign hdiutil; do
-            command -v "$command" >/dev/null || { echo "Missing: $command"; exit 1; }
+            command -v "$command" >/dev/null || { echo "Missing macOS build tool: $command" >&2; exit 1; }
           done
           node -e 'if (Number(process.versions.node.split(".")[0]) < 20) process.exit(1)'
-          if ! command -v uv >/dev/null; then brew install uv; fi
+          if ! command -v uv >/dev/null; then
+            brew install uv
+          fi
           uv --version
-      - name: Validate Mastery source and run regression tests
+          node --version
+          xcrun swiftc --version
+      - name: Verify source integrity and run 84+ regression tests
         script: |
           set -euo pipefail
           test -f scripts/apply_overlay.py
@@ -30,21 +35,22 @@ workflows:
           uv python install 3.11
           uv run --no-project --python 3.11 --with pytest python -m pytest tests/ -q
           bash -n scripts/*.sh
-      - name: Build bundled native Mac app and DMG
+      - name: Build complete self-contained Apple Silicon application
         script: |
           set -euo pipefail
           bash scripts/build_portable_macos.sh
           test -s dist/MasteryEngine2-AppleSilicon-Standalone.dmg
-      - name: Prove real app starts and grades an offline question
+      - name: Prove bundled app can create, grade, and erase a temporary course
         script: |
           set -euo pipefail
           bash scripts/codemagic_smoke.sh
-      - name: Publish verified DMG
+      - name: Publish DMG only after a successful live smoke test
         script: |
           set -euo pipefail
           mkdir -p release
           cp dist/MasteryEngine2-AppleSilicon-Standalone.dmg release/
           shasum -a 256 release/*.dmg > release/SHA256SUMS.txt
+          cat release/SHA256SUMS.txt
     artifacts:
       - release/*.dmg
       - release/SHA256SUMS.txt

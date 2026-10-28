@@ -1,0 +1,72 @@
+"""No-model instructional scaffolds. Not an LLM or simulated chat.
+
+Each topic has an independently authored general teaching note. The exact
+problem answer is intentionally withheld until the user submits a response.
+"""
+LESSONS={
+ 'Linear equations':('Balance both sides of the equation. Distribute, combine like terms, and isolate x.', 'Solve 3(x+2)=2x+11: expand to 3x+6=2x+11, then subtract 2x and 6 to get x=5.', 'Did you distribute the coefficient to EVERY term?'),
+ 'Quadratics & factoring':('For ax²+bx+c=0, factor when possible or use the quadratic formula. The two roots may have different signs.', 'x²−5x+6=(x−2)(x−3), so its roots are 2 and 3.', 'Did you verify both roots in the original equation?'),
+ 'Quadratic functions':('Vertex form a(x−h)²+k has vertex (h,k). The sign INSIDE the parentheses is opposite to h.', 'y=2(x+4)²−3 has vertex (−4,−3).', 'Did you reverse the sign inside the squared expression?'),
+ 'Systems of equations':('Use substitution or elimination. Multiply equations so one variable has opposite coefficients, then add.', 'For x+y=7 and 2x−y=5, add equations to get 3x=12, so x=4 and y=3.', 'Check the ordered pair in BOTH original equations.'),
+ 'Exponents & exponential equations':('Isolate the exponential term, then express both sides with the same base.', '2·3ˣ=54 becomes 3ˣ=27=3³, so x=3.', 'Did you isolate the power before solving for the exponent?'),
+ 'Linear functions':('Find slope m=(y₂−y₁)/(x₂−x₁); then solve for b using y=mx+b.', 'Points (1,5) and (3,11) give m=3 and b=2; f(0)=2.', 'Is your result slope or y-intercept?'),
+ 'Arithmetic sequences':('Term n is a₁+(n−1)d, not a₁+nd for indexing beginning at 1.', 'Starting at 7 with difference 4, a₅=7+4·4=23.', 'Does a₁ reproduce the first term?'),
+ 'Series & sigma notation':('For arithmetic series, calculate Sₙ=n(a₁+aₙ)/2.', 'The sum 3+7+11+15 equals 4(3+15)/2=36.', 'Are you calculating a term or the sum of all terms?'),
+ 'Sigma notation':('Use Σ from k=1 to n of k = n(n+1)/2 and split sums across addition.', 'Σ(k=1..5)(2k+1)=2·15+5=35.', 'Do not multiply the constant just once; it appears n times.'),
+ 'Geometric sequences':('Term n is a₁r⁽ⁿ⁻¹⁾. A ratio multiplies successive terms.', 'For first term 3, ratio 2, term 5 is 3·2⁴=48.', 'Do you need a term or a sum?'),
+ 'Geometric series':('For r≠1, Sₙ=a₁(rⁿ−1)/(r−1). Do not confuse with the nth-term formula.', '2+6+18+54=2(3⁴−1)/(3−1)=80.', 'Confirm the number of terms and the exponent.'),
+ 'Conditional probability':('Conditional probability restricts the denominator to the selected subgroup: P(A|B)=P(A∩B)/P(B).', 'Among 8 club members, 3 prefer math: P(math|club)=3/8, even if there are 30 nonmembers.', 'Are you including people outside the given condition?'),
+ 'Percent change':('Successive changes compound. Multiply by 1+p for increases and 1−p for decreases.', '$100 up 20% then down 20% becomes 100·1.2·0.8=$96, not $100.', 'Each percentage uses the newly changed base.'),
+ 'Data & averages':('Mean equals total divided by count; recover the missing total first.', 'If four scores average 12, their sum is 48. Three totaling 32 leave 16 for the fourth.', 'Did you multiply the mean by the number of values?'),
+ 'Ratios & proportions':('A ratio describes matching parts. Determine a single scale factor.', 'For flour:sugar=3:2, 12 g flour corresponds to 4 g per part and 8 g sugar.', 'Are the units consistent?'),
+ 'Geometry & trigonometry':('For right triangles a²+b²=c². The longest side c is opposite the right angle.', 'Legs 5 and 12 give c=√(25+144)=13.', 'Is the length requested a leg or the hypotenuse?'),
+ 'Circle geometry':('Arc length = θ/360° · 2πr. Sector area uses πr² instead.', 'With radius 6 and angle 60°, arc length = (1/6)·12π=2π.', 'Are you answering length or area?'),
+ 'Free fall':('Choose a positive direction, then use displacement v₀t+½gt²; gravity does not vanish at the peak.', 'From rest at g=10, a 3-second fall covers 5·3²=45 m.', 'Did you square the TIME rather than the acceleration?'),
+ 'Projectile motion':('Treat vertical and horizontal motion separately. Neglecting drag, horizontal speed is constant and vertical acceleration is g.', 'At 12 m/s horizontally for 4 s, horizontal range is 48 m independent of drop formula.', 'Which direction is the question asking about?'),
+ 'Average speed':('Average speed = total distance / total time, not a simple average of speeds when durations differ.', 'At 3 m/s for 2 s then 6 m/s for 3 s, average = (6+18)/(2+3)=4.8 m/s.', 'Did you sum distances AND times first?'),
+ 'Average velocity vs. speed':('Average velocity is signed displacement divided by elapsed time. Average speed uses total distance.', '80 m east then 30 m west in 10 s gives average velocity 5 m/s east, but average speed 11 m/s.', 'Did you subtract the return trip for displacement?'),
+ 'Acceleration':('Acceleration equals Δvelocity/Δtime; positive acceleration does not necessarily mean moving faster if velocity is negative.', 'From 2 m/s to 14 m/s in 4 s: a=(14−2)/4=3 m/s².', 'Subtract final and initial velocities in the correct order.'),
+ 'Newton’s second law':('Net force, not any individual force, equals mass times acceleration.', 'A 5 kg cart accelerating at 3 m/s² has net force 15 N.', 'Do you know the NET acceleration and the correct SI units?'),
+ 'Position–time graph translation':('The slope of position against time gives signed velocity. A horizontal line means zero velocity.', 'From (0 s, 5 m) to (4 s, −3 m), velocity = (−3−5)/(4−0)=−2 m/s.', 'Are you reading the slope, not the graph height?'),
+ 'Velocity–time graphs':('Area under a velocity-time graph gives displacement, and slope gives acceleration.', 'Velocity increasing from 2 to 6 m/s over 3 s gives trapezoid area (2+6)·3/2=12 m.', 'Does the question ask for slope or signed area?'),
+ 'Cross-text connections':('State what the second text does TO the first: supports, limits, extends, or contradicts. Do not jump to total rejection when it only qualifies.', 'If A claims a general benefit and B shows it varies by conditions, B qualifies the benefit; it does not automatically disprove it.', 'What exact claim, not the whole topic, is being modified?'),
+ 'Evidence interpretation':('Separate observation, inference, and proof of cause. Prefer the narrowest answer the evidence can sustain.', 'A higher value after two simultaneous changes cannot uniquely identify the cause.', 'Does the choice assert more than the evidence shows?'),
+ 'Causal inference':('An association alone is not proof of a cause. Identify confounders and compare similar groups when possible.', 'If a club starts tutoring and changes teachers, higher grades cannot be attributed exclusively to tutoring.', 'Which other relevant variable changed?'),
+ 'Reading inference':('Choose the supported claim with no extra universal or causal assumptions.', '“Some plants survived” supports “at least some survived,” not “all species thrived.”', 'Look for the exact population, time period, and certainty.'),
+ 'Words in context':('Replace the word with each option in its sentence, then use surrounding details to eliminate tone and scope mismatches.', '“Austere decorations” alongside plain walls means restrained, not lavish.', 'Which nearby phrase acts as a definition?'),
+ 'Evaluating statistical claims':('Check who was sampled, what was measured, and whether a baseline/control group is present.', 'A survey of gym members need not represent every adult in a city.', 'Is the sample representative of the claim’s target population?'),
+ 'Experimental design':('Vary the tested factor and hold likely confounders constant; random assignment helps.', 'To test fertilizer, give randomized similar plots equal light/water while changing fertilizer.', 'Does the design vary more than one relevant condition?'),
+ 'Clause boundaries':('Find the independent clauses. Use a period, semicolon, or comma plus coordinating conjunction to join them; dependent clauses behave differently.', '“It rained; we stayed” works because both sides can stand as complete sentences.', 'Can both sides of the punctuation stand alone?'),
+ 'Subject-verb agreement':('Identify the HEAD subject, ignoring interrupting phrases and prepositional phrases.', '“The stack of books IS tall” is singular because stack is the head noun.', 'What is the head noun?'),
+ 'Neither/nor agreement':('With neither...nor, the verb normally agrees with the nearer subject.', '“Neither the coach nor the players WERE ready”; reverse the order and “coach WAS ready.”', 'Which subject is closer to the verb?'),
+ 'Contrast transitions':('Label the relationship first: contrast, cause, example, or addition. Then select a matching transition.', '“The plan costs more; HOWEVER, it saves time.” signals contrast.', 'Does the second clause defy the first clause’s expectation?'),
+ 'Transitions':('Identify whether the second claim is cause, effect, sequence, addition, or contrast.', '“The reservoir was empty; THEREFORE, watering was restricted.” shows effect.', 'Can you state the relationship in one word?'),
+ 'Pronoun precision':('Who is a subject, whom is an object, whose shows possession. Verify antecedent number and case.', '“The scientist WHO spoke” versus “The scientist WHOM we interviewed.”', 'Is the pronoun doing the action or receiving it?'),
+ 'Verb tense':('Keep timing coherent. Use past perfect for an event completed before another past event.', '“By the time she arrived, the train HAD LEFT.”', 'Where is each event on a timeline?'),
+ 'Parallelism':('Repeated list elements or paired conjunctions should have the same grammatical structure.', '“To run, to swim, and to bike” is parallel; “to run, swimming, and bikes” is not.', 'Do the phrases have identical grammatical jobs?'),
+ 'Punctuation':('Use a colon after an independent clause to introduce a list or explanation. Separate two independent clauses with a semicolon.', '“We need three things: paper, ink, and time.”', 'Can the clause before the colon stand on its own?'),
+ 'Modifiers':('Place a modifier next to the noun doing the modified action to avoid accidental meaning.', '“Walking home, I saw a dog” is clear; “Walking home, a dog appeared” says the dog was walking.', 'Who actually performed the opening action?'),
+ 'Word choice':('Choose comparison, tone, and precision that fit the sentence: two objects typically take comparative; three or more, superlative.', '“Less costly than the old plan”; “least costly of four plans.”', 'How many objects are compared?'),
+ 'Rational equations':('When a variable appears in a denominator, record excluded values first. Multiply by the denominator, solve, and check that you did not introduce an invalid solution.',
+   '(x−5)/(x−1)=3 requires x≠1. Multiply to get x−5=3x−3, so −2=2x and x=−1, which is allowed.',
+   'Does your answer make the original denominator zero?'),
+ 'Quadratic root relationships':('For a monic quadratic, the two roots sum to −b and multiply to c. If their sum S and absolute difference D are known, the roots are (S±D)/2.',
+   'If two roots sum to 8 and differ by 2, they are (8+2)/2=5 and (8−2)/2=3. Their product is 15.',
+   'Did you confuse the sum of roots with their product?'),
+ 'Function composition':('f(g(x)) means apply g FIRST, then apply f. To solve f(g(x))=target, undo the outer function before undoing the inner function.',
+   'If f(x)=2x+3 and g(x)=x−4, then f(g(t))=2(t−4)+3=2t−5. Setting this to 9 gives t=7.',
+   'Did you substitute g(t) for every occurrence of x in f?'),
+ 'Linear model comparison':('Translate each real-world plan into fixed cost plus rate times quantity; the crossing point solves cost A = cost B.',
+   'Service A: 12+5m; B: 30+2m. Set equal: 12+5m=30+2m, so 3m=18 and m=6.',
+   'Are you comparing total costs, not just the per-unit rates?'),
+ 'ACT Science data interpretation':('Read the axes or table, describe the observed pattern, then distinguish it from an unsupported causal explanation.', 'If values rise from 5 to 12 as temperature rises in one experiment, the safe statement is that the variables rose together there.', 'Does the answer exceed the actual data?'),
+}
+
+
+def lesson_for(skills: list[str], hint: str | None = None) -> dict:
+    skill = next((str(s) for s in skills if str(s) in LESSONS),str(skills[0]) if skills else 'General reasoning')
+    principle,worked,check=LESSONS.get(skill,('Identify the relationship being tested, then justify each step with evidence.',
+       'Work through a simpler case, confirm units or wording, then apply that idea to the original question.',
+       'Which assumption is necessary for your chosen answer?'))
+    return {'skill':skill,'principle':principle,'worked_example':worked,'transfer_check':check,
+            'hint':hint or 'Identify what is given, what is asked, and the single missing connection.'}
