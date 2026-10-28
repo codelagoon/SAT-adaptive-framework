@@ -78,6 +78,7 @@ def shutdown(proc):
     return ((out or b'')+(err or b'')).decode(errors='replace')
 
 
+@pytest.mark.skipif(sys.platform == 'darwin', reason='Legacy fake-node Linux fixture; native Mac bundled app smoke tests real startup and cleanup')
 def test_real_launcher_starts_both_endpoints_and_exits_on_terminate(simulated_install):
     if not free_ports():pytest.skip('runtime ports already used')
     root,resources=simulated_install
