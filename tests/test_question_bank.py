@@ -30,7 +30,7 @@ def test_subject_mapping():
 
 
 def test_worksheet_free_interface():
-    ui=(ROOT/'overlay/apps/web/src/app/mastery/page.tsx').read_text()
+    ui=(ROOT/'overlay/apps/web/src/app/mastery/legacy/page.tsx').read_text()
     assert 'Upload a worksheet' not in ui
     assert 'Start practice' in ui
     assert 'starter-questions' in ui
