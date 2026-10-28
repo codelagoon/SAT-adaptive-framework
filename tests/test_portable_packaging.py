@@ -109,7 +109,10 @@ exec '{sys.executable}' '{mock}' 18766
                             if b'"status":"ok"' in r.read():ready=True;break
                     except OSError:pass
                     time.sleep(.15)
-                self.assertTrue(ready,'Mock API & web did not start')
+                if not ready:
+                    process.terminate()
+                    details=process.communicate(timeout=5)[0]
+                    self.fail(f'Mock API & web did not start (exit={process.returncode}): {details.decode(errors="replace")}')
                 self.assertIsNone(process.poll())
             finally:
                 process.terminate()
