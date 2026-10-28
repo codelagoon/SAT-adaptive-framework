@@ -17,10 +17,18 @@ jobs:
         with:
           node-version: '22'
       - uses: astral-sh/setup-uv@v6
-      - name: Unit and integration-contract tests
+      - name: Unit and integration-contract tests (collect failures)
         run: |
-          uv run --with pytest --python 3.11 python -m pytest tests/ -q
+          set +e
+          uv run --with pytest --python 3.11 python -m pytest tests/ -q > "${RUNNER_TEMP}/mastery-unit.log" 2>&1
+          status=$?
+          cat "${RUNNER_TEMP}/mastery-unit.log"
           bash -n scripts/*.sh
+          syntax_status=$?
+          if [ "$syntax_status" -ne 0 ]; then status="$syntax_status"; fi
+          echo "$status" > "${RUNNER_TEMP}/mastery-unit-status"
+          echo "Unit-test status: $status (real app build will still be attempted; release remains gated)"
+          exit 0
       - name: Build portable app and DMG
         run: bash scripts/build_portable_macos.sh
       - name: Smoke test bundled runtime (no system Python or Node)
@@ -64,6 +72,12 @@ jobs:
           finally:
               if course:call(f'/courses/{course}','DELETE')
           PY
+      - name: Release gate (all unit tests must pass)
+        run: |
+          test "$(cat "${RUNNER_TEMP}/mastery-unit-status")" = 0 || {
+            echo 'Unit tests failed: bundle may be useful for diagnosis, but no release is allowed.'
+            exit 1
+          }
       - name: Upload installable DMG artifact
         uses: actions/upload-artifact@v4
         with:
