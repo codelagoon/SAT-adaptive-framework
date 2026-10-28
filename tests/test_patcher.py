@@ -14,7 +14,8 @@ def fixture_source(tmp_path):
       'apps/api/services/router_registry.py':f'begin\n{installer.ROUTER_ANCHOR}\nend',
       'apps/api/routers/quiz_submission.py':f'begin\n{installer.CLASSIFIER_ANCHOR}\n{installer.SUBMISSION_ANCHOR}\n{installer.RESPONSE_ID_ANCHOR}\nend',
       'apps/api/routers/courses_crud.py':f'begin\n{installer.DELETE_COURSE_ANCHOR}\nend',
-      'apps/web/src/app/_components/dashboard-sidebar.tsx':f'begin\n{installer.SIDEBAR_ANCHOR}\nend',
+      'apps/web/next.config.ts':f'const beforeFiles=[\n{installer.WEB_COURSE_ANCHOR}\n]',
+        'apps/web/src/app/_components/dashboard-sidebar.tsx':f'begin\n{installer.SIDEBAR_ANCHOR}\nend',
       'apps/web/src/app/layout.tsx':f'{installer.FONT_IMPORT}\n{installer.FONT_CONFIG}\n<html {installer.FONT_CLASS}>',
       'scripts/quickstart.sh':f'#!/bin/bash\n{installer.FASTSETUP_ANCHOR}\n{installer.WEB_BIND_ANCHOR}\n',
       'apps/web/src/app/globals.css':f'{installer.FONT_CSS_ANCHOR}sans-serif;\n',
@@ -31,6 +32,7 @@ def test_overlay_patches_and_is_idempotent(tmp_path):
     assert 'record_attempt' in (root/'apps/api/routers/quiz_submission.py').read_text()
     assert 'Mastery Engine 2.0' in (root/'apps/web/src/app/_components/dashboard-sidebar.tsx').read_text()
     assert (root/'apps/web/src/app/mastery/page.tsx').exists()
+    assert '/api/courses/' in (root/'apps/web/next.config.ts').read_text()
 
 def test_fails_closed_before_modifications(tmp_path):
     root=fixture_source(tmp_path)
