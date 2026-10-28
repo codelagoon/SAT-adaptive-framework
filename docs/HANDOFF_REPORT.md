@@ -24,7 +24,7 @@
 ## Known gaps / no false completion claims
 
 - **Not integrated** in current `codex/mac-release-foundation` branch; supplied patch is reviewed/tested against snapshot and needs reconciliation.
-- Existing Next combined UI still stands. New preview is not the installed UI, and Desmos button is a link rather than a verified embedded calculator.
+- A new source-level Next workspace with separate Home/Learn/Bank/Solve/Tests/Analytics routes was added; old combined UI remains at /mastery/legacy. The illustrative HTML preview and TSX source have NOT been run together inside the actual bundled Mac application. Desmos iframe rendering/permissions remain unverified, and its online-only limitations must be enforced.
 - Existing data collection cannot reconstruct historical hints, reasons or first-attempt event ordering when timestamps collide; migration records such evidence as legacy-unverified.
 - No full React/Next build or authenticated FastAPI HTTP integration test was possible without the pinned full upstream checkout/dependencies. Existing source unit/contract test suite passes in Linux; actual Mac end-to-end remains Codex's work.
 - **No** independently validated SAT/ACT score prediction, full exam adaptive blueprint, complete editorially reviewed item bank, or measurable learning-effectiveness trial. Detailed content authoring and expert review remain expensive, independent work.
@@ -40,3 +40,7 @@
 6. After all green, gate default navigation switch; no release-ready label until signed/notarized and installer/update proof.
 
 **Principle:** This is tested incremental software, not a claim that the entire Mastery Engine product is 100% finished.
+
+## Production study workspace update
+
+See `docs/PRODUCTION_UI_HANDOFF.md` for new route ownership, source-only checks, and the exact native/Next acceptance work required before merge.
