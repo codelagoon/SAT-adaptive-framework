@@ -29,7 +29,7 @@ PLIST
 printf '%s\n' "${INSTALL_DIR}/OpenTutor" > "${APP}/Contents/Resources/opentutor-path.txt"
 command -v node > "${APP}/Contents/Resources/node-path.txt"
 cp "${ROOT}/scripts/mastery_launch.sh" "${APP}/Contents/Resources/mastery_launch.sh"
-xcrun swiftc -O -target arm64-apple-macos13 -framework Cocoa -framework WebKit \
+xcrun swiftc -parse-as-library -O -target arm64-apple-macos13 -framework Cocoa -framework WebKit \
   "${ROOT}/macos/MasteryApp.swift" -o "${APP}/Contents/MacOS/MasteryEngine2"
 chmod +x "${APP}/Contents/MacOS/MasteryEngine2"
 if command -v hdiutil >/dev/null; then
