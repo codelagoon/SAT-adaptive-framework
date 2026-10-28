@@ -62,11 +62,17 @@ class PortablePackagingTest(unittest.TestCase):
         self.assertIn('smoke-test',text)
         self.assertIn('Upload installable DMG artifact',text)
         self.assertLess(text.index('Smoke test bundled runtime'),text.index('Upload installable DMG artifact'))
+        # The isolated Mac workflow delegates end-to-end tests to the shared
+        # Codemagic smoke script. Resolve that script before validating gates.
+        if 'run: bash scripts/codemagic_smoke.sh' in text:
+            text += (BASE/'scripts/codemagic_smoke.sh').read_text()
         self.assertIn('mastery_launch.sh',text)
         self.assertIn('mastery/prepare',text)
         self.assertIn('quiz/submit',text)
         self.assertIn("'DELETE'",text)
 
+    @unittest.skipIf(sys.platform == 'darwin',
+        'Synthetic Linux-only executable stubs are not representative on macOS; bundled app smoke is required in mac CI')
     def test_local_runtime_smoke_simulation(self):
         if not ports_free():
             self.skipTest('Ports already used')
