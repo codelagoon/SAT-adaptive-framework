@@ -33,7 +33,7 @@ def simulated_install(tmp_path):
     (web/'.next').mkdir(parents=True)
     (web/'node_modules/.bin').mkdir(parents=True)
     resources.mkdir()
-    (resources/'node-path.txt').write_text('/bin/true\n')
+    (resources/'node-path.txt').write_text(sys.executable+'\n')
     (web/'.next/BUILD_ID').write_text('test')
     mock_server=tmp_path/'server.py'
     mock_server.write_text('''
@@ -93,7 +93,9 @@ def test_real_launcher_starts_both_endpoints_and_exits_on_terminate(simulated_in
                     if b'"status":"ok"' in res.read():break
             except OSError:pass
             time.sleep(.1)
-        assert process.poll() is None,'launcher exited before becoming healthy'
+        if process.poll() is not None:
+            details=process.communicate(timeout=5)[0]
+            pytest.fail(f'launcher exited before health: {details.decode(errors="replace")}')
         # Let the launcher's own readiness loop finish before terminating it.
         time.sleep(2.5)
         assert process.poll() is None, 'launcher exited unexpectedly'
