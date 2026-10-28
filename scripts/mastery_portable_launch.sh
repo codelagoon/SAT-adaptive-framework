@@ -24,6 +24,7 @@ export AMBIENT_MONITOR_ENABLED=false
 export NEXT_PUBLIC_API_URL='http://127.0.0.1:18765/api'
 export CORS_ORIGINS='http://127.0.0.1:18766'
 export MASTERY_DATA_DIR="${USER_DATA}"
+export DATABASE_URL="sqlite+aiosqlite:///${USER_DATA}/opentutor.sqlite3"
 export UPLOAD_DIR="${USER_DATA}/uploads"
 # Local-only API ports. Refuse to connect an unauthenticated app to unrelated services.
 "${PYTHON}" - <<'PY'
