@@ -60,6 +60,7 @@ def read_draft(conn,user_id:str,course_id:str,problem_id:str) -> dict | None:
 
 
 def clear_draft(conn,user_id:str,course_id:str,problem_id:str) -> None:
-    install(conn)
+    # Called inside the grade transaction. DDL executescript() would implicitly
+    # commit and break atomicity, so trust engine.connect() to install schema.
     conn.execute('DELETE FROM answer_drafts WHERE user_id=? AND course_id=? AND problem_id=?',
                  (user_id,course_id,problem_id))
