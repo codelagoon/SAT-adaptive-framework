@@ -89,7 +89,7 @@ def test_real_launcher_starts_both_endpoints_and_exits_on_terminate(simulated_in
             if process.poll() is not None:break
             try:
                 import urllib.request
-                with urllib.request.urlopen('http://127.0.0.1:18766/api/mastery/health',timeout=.5) as res:
+                with urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:18766/api/mastery/health',timeout=.5) as res:
                     if b'"status":"ok"' in res.read():break
             except OSError:pass
             time.sleep(.1)
@@ -101,7 +101,7 @@ def test_real_launcher_starts_both_endpoints_and_exits_on_terminate(simulated_in
         assert process.poll() is None, 'launcher exited unexpectedly'
         import urllib.request
         for url in ('http://127.0.0.1:18765/api/health','http://127.0.0.1:18766/api/mastery/health'):
-            with urllib.request.urlopen(url,timeout=2) as response:
+            with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(url,timeout=2) as response:
                 assert b'"status":"ok"' in response.read()
     finally:
         output=shutdown(process)
