@@ -36,6 +36,15 @@ for i in {1..120}; do
   sleep 1
 done
 if [[ "$READY" != 1 ]]; then cat "$LOG" >&2; echo 'Bundled API/UI readiness timed out' >&2; exit 1; fi
+# Smoke the learner UI itself, not merely the health endpoint.
+PAGE="$(mktemp)"
+trap 'rm -f "$PAGE"; cleanup' EXIT INT TERM
+curl --noproxy '*' -fsS --max-time 20 'http://127.0.0.1:18766/mastery' > "$PAGE"
+grep -q 'Learn where it gets difficult' "$PAGE" || {
+  cat "$LOG" >&2
+  echo 'Mastery learner UI failed to render on bundled Next server' >&2
+  exit 1
+}
 "$RES/python/bin/python3.11" - <<'PY'
 import json, urllib.request, uuid
 base = 'http://127.0.0.1:18766/api'
@@ -65,13 +74,22 @@ try:
         'problem_id': next_item['id'], 'user_answer': 'Z', 'answer_time_ms': 1800
     })
     assert graded['is_correct'] is False and graded.get('result_id'), graded
+    diagnosis = call(f'/mastery/courses/{course}/offline-diagnosis/{next_item["id"]}?attempt_id={graded["result_id"]}')
+    assert diagnosis['correct'] is False, diagnosis
     overview = call(f'/mastery/courses/{course}/overview')
     assert overview['recent_errors'] and overview['skills'], overview
     print('PASS: real OpenTutor, bundled Python/Node, local study, grading and mastery history')
 finally:
     if course is not None:
         call(f'/courses/{course}', 'DELETE')
-print('PASS: temporary learning course deleted')
+        import sqlite3, pathlib
+        dbfile = pathlib.Path.home() / 'Library/Application Support/MasteryEngine2/mastery.sqlite3'
+        if dbfile.is_file():
+            with sqlite3.connect(dbfile) as conn:
+                for table in ('attempts','mastery','edges','propositions','diagnostic_probes','learning_queue'):
+                    count=conn.execute(f'SELECT COUNT(*) FROM {table} WHERE course_id=?',(course,)).fetchone()[0]
+                    assert count == 0, (table,count)
+print('PASS: temporary learning course deleted and extension data purged')
 PY
 # Ensure the DMG mountable on the actual macOS host, without touching /Applications.
 MOUNT_DIR="$(mktemp -d /tmp/mastery-codemagic-mount.XXXXXX)"
