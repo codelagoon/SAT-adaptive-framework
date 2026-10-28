@@ -85,7 +85,7 @@ def report(conn: sqlite3.Connection, user_id: str, course_id: str,
     """
     install(conn)
     rows=[dict(r) for r in conn.execute('''SELECT * FROM attempt_events
-      WHERE user_id=? AND course_id=? ORDER BY recorded_at,result_id''',
+      WHERE user_id=? AND course_id=? ORDER BY recorded_at,rowid''',
       (str(user_id),str(course_id))).fetchall()]
     seen=set(); first=[]; eligible=[]; repeats=[]; guided=[]; groups=defaultdict(list)
     for row in rows:
