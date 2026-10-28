@@ -105,7 +105,7 @@ exec '{sys.executable}' '{mock}' 18766
                 while time.monotonic()<deadline:
                     if process.poll() is not None:break
                     try:
-                        with urllib.request.urlopen('http://127.0.0.1:18766/api/mastery/health',timeout=.5) as r:
+                        with urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://127.0.0.1:18766/api/mastery/health',timeout=.5) as r:
                             if b'"status":"ok"' in r.read():ready=True;break
                     except OSError:pass
                     time.sleep(.15)
