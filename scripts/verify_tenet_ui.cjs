@@ -18,7 +18,7 @@ async function api(url, method = 'GET', body) {
 }
 function keyFor(id) {
   const p = spawnSync(process.env.TENET_PYTHON, ['-c',
-    'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); print(c.execute("SELECT correct_answer FROM practice_problems WHERE id=?",(sys.argv[2].replace("-",""),)).fetchone()[0])',
+    'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); print(c.execute("SELECT correct_answer FROM practice_problems WHERE id=? OR id=?",(sys.argv[2],sys.argv[2].replace("-",""))).fetchone()[0])',
     path.join(data, 'opentutor.sqlite3'), id], { encoding: 'utf8' });
   assert.equal(p.status, 0, p.stderr); return p.stdout.trim();
 }
@@ -55,7 +55,7 @@ function keyFor(id) {
     await page.getByRole('button', {name:/TN-002/}).click();
     const recommendation = page.getByRole('complementary', {name:'Selected recommendation details'}).getByRole('link');
     assert(new URL(await recommendation.getAttribute('href'), base).pathname.endsWith('/solve'), 'Selecting Solve block must open Solve, not the first Learn block');
-    await page.getByRole('link', { name: 'Question Bank', exact: true }).click();
+    await page.getByRole('navigation', {name:'Study sections'}).getByRole('link', { name: 'Question Bank', exact: true }).click();
     await page.getByRole('heading', { name: 'Find the right questions.', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Difficulty', exact: true }).click();
     await page.keyboard.press('End'); await page.keyboard.press('Enter');
@@ -65,6 +65,7 @@ function keyFor(id) {
     await page.getByText('No matching questions.', { exact: false }).waitFor();
     await page.getByRole('textbox', { name: 'Search questions', exact: true }).fill('');
     await page.locator('a[href*="/mastery/solve"][href*="id="]').first().waitFor();
+    let raceExercised=false;
     async function solve(item, assisted, correct) {
       await visit(`/mastery/solve?courseId=${course}&id=${item.id}`, item.question);
       assert.equal(await page.getByRole('navigation', { name: 'Study sections' }).isVisible(), false);
@@ -81,6 +82,36 @@ function keyFor(id) {
         assert((await api(`${prefix}/questions?status=bookmarked`)).questions.some(q => q.id === item.id));
         await page.getByRole('button', { name: 'Need a hint?', exact: true }).click();
         await page.getByText('Hinted work is recorded separately', { exact: false }).waitFor();
+      }
+      let releaseDraft;
+      if (!raceExercised) {
+        let announce;
+        const observed=new Promise(resolve=>{announce=resolve});
+        const hold=new Promise(resolve=>{releaseDraft=resolve});
+        let held=false;
+        await page.route(`**/questions/${item.id}/draft`,async route=>{
+          if(route.request().method()==='PUT'&&!held){held=true;announce();await hold}
+          await route.continue();
+        });
+        await page.getByRole('textbox',{name:'Optional reasoning'}).fill('Draft held across submit boundary');
+        await observed;
+        let quizSent=false;
+        const onRequest=r=>{if(r.url().endsWith('/api/quiz/submit'))quizSent=true};
+        page.on('request',onRequest);
+        const click=page.getByRole('button',{name:'Check answer',exact:true}).click();
+        try {
+          await page.waitForTimeout(250);
+          assert.equal(quizSent,false,'Submit must settle outstanding draft writes before grading');
+        } finally {releaseDraft()}
+        await click;
+        await page.getByRole('heading',{name:correct?'Correct':'Not yet',exact:true}).waitFor();
+        page.off('request',onRequest);
+        await page.unroute(`**/questions/${item.id}/draft`);
+        raceExercised=true;
+        await page.waitForTimeout(900);
+        assert.equal((await api(`${prefix}/questions/${item.id}/draft`)).draft,null);
+        assert.deepEqual(errors,[]);
+        return;
       }
       const response = page.waitForResponse(r => r.url().endsWith('/api/quiz/submit') && r.request().method() === 'POST');
       await page.getByRole('button', { name: 'Check answer', exact: true }).click();
@@ -101,6 +132,12 @@ function keyFor(id) {
     report = await api(`${prefix}/analytics`);
     assert.equal(report.sample_count, 3); assert.equal(report.independent_first_attempts.total, 2);
     assert.equal(report.independent_first_attempts.correct, 1); assert.equal(report.assisted_attempts.total, 1);
+    await visit(`/mastery?courseId=${course}`, 'Study queue');
+    await page.getByRole('button',{name:'Active course',exact:true}).click();
+    await page.getByRole('option',{name:'Physics',exact:true}).click();
+    await page.waitForURL(`**courseId=${courses[1]}`);
+    await page.goBack({waitUntil:'networkidle'});
+    assert((await page.getByRole('button',{name:'Active course',exact:true}).innerText()).includes('SAT Math'),'Back must restore URL-owned course');
     await visit(`/mastery/learn?courseId=${course}`, 'Learn the skills.');
     await page.getByRole('button', { name: 'Reveal worked example', exact: true }).click();
     assert.equal(await page.getByRole('button', { name: 'Reveal worked example', exact: true }).count(), 0);

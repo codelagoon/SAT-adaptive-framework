@@ -165,12 +165,17 @@ def prepare_context(user_id: str, problem_id: str, confidence: int | None, reaso
           (str(user_id), str(problem_id), confidence, reasoning, utcnow().isoformat(), mode, difficulty_level, int(assisted)))
 
 
-def mark_hint_exposure(user_id: str, course_id: str, problem_id: str) -> None:
+def mark_hint_exposure(user_id: str, course_id: str, problem_id: str, skills: list[str] | None = None) -> None:
     # Server-owned sticky provenance, independent of client help flags.
     with _LOCK, connect() as conn:
-        conn.execute('''INSERT OR IGNORE INTO hint_exposures
+        now=utcnow().isoformat()
+        inserted=conn.execute('''INSERT OR IGNORE INTO hint_exposures
             (user_id,course_id,problem_id,shown_at) VALUES (?,?,?,?)''',
-            (str(user_id),str(course_id),str(problem_id),utcnow().isoformat()))
+            (str(user_id),str(course_id),str(problem_id),now)).rowcount
+        event_id=(f'legacy:{user_id}:{course_id}:{problem_id}' if inserted else str(uuid.uuid4()))
+        conn.execute('INSERT INTO hint_events VALUES (?,?,?,?,?,?)',
+            (event_id,str(user_id),str(course_id),str(problem_id),json.dumps(skills or []),now))
+
 
 
 def record_attempt(*, result_id: str, user_id: str, course_id: str,
@@ -198,6 +203,9 @@ def record_attempt(*, result_id: str, user_id: str, course_id: str,
         mode = ctx['mode'] if ctx and ctx['mode'] in ('challenge','repair','review','transfer') else 'challenge'
         level = ctx['difficulty_level'] if ctx else None
         now = utcnow()
+        fresh = not conn.execute('''SELECT 1 FROM attempt_events WHERE user_id=?
+            AND course_id=? AND problem_id=? LIMIT 1''',
+            (str(user_id),str(course_id),str(problem_id))).fetchone()
         analytics.add_event(conn, result_id=result_id, user_id=user_id, course_id=course_id,
             problem_id=problem_id, skills=skills, correct=correct,
             assisted=assisted, mode=mode,
@@ -218,18 +226,13 @@ def record_attempt(*, result_id: str, user_id: str, course_id: str,
             root_level = queue['root_level'] if queue else None
             # Treat a transfer as confirmed only when it meets the missed
             # question's difficulty and follows an actual repair step.
-            verified_transfer = (not assisted and mode == 'transfer' and prior_phase == 'transfer'
+            verified_transfer = (fresh and not assisted and mode == 'transfer' and prior_phase == 'transfer'
                 and root_level is not None and level is not None and level >= root_level)
-            valid_foundation = (mode == 'repair' and prior_phase == 'repair'
+            valid_foundation = (fresh and not assisted and mode == 'repair' and prior_phase == 'repair'
                 and root_level is not None and level is not None and level < root_level)
             state = conn.execute('''SELECT review_successes,retention_lapses,last_independent_at
                 FROM review_progress WHERE user_id=? AND course_id=? AND skill=?''',
                 (str(user_id),str(course_id),skill)).fetchone()
-            # The grade event has been inserted already. Ignore its own ID when
-            # checking whether the question is fresh in this user/course.
-            fresh = not conn.execute('''SELECT 1 FROM attempt_events WHERE user_id=?
-                AND course_id=? AND problem_id=? AND result_id != ? LIMIT 1''',
-                (str(user_id),str(course_id),str(problem_id),str(result_id))).fetchone()
             prior = float(previous['p']) if previous else P_INIT
             # A solved foundation question after a miss is weak evidence of
             # mastery of the *hard* target. Credit it conservatively.
@@ -237,17 +240,19 @@ def record_attempt(*, result_id: str, user_id: str, course_id: str,
             n = int(previous['n'])+1 if previous else 1
             streak = (int(previous['streak']) if previous else 0) + (1 if mode != 'repair' else 0) if correct else 0
             # An assisted correct answer is practice, not fresh independent mastery.
-            if assisted and correct:
+            if correct and (assisted or not fresh):
                 p = prior
                 streak = int(previous['streak']) if previous else 0
             # Durable spacing: only a fresh, independent, overdue retrieval
             # advances intervals. Repeated same-day correct responses do not.
             prior_due = previous['due_at'] if previous else None
             previous_independent_at = state['last_independent_at'] if state else None
+            previous_exposure_at = analytics.latest_exposure_at(conn,str(user_id),str(course_id),skill,
+                exclude_result_id=str(result_id),before=now) if previous_independent_at else None
             review_successes = int(state['review_successes']) if state else 0
             due_iso, review_successes, delayed_review = science_policy.next_review(
                 now=now, prior_due=prior_due,
-                previous_independent_at=previous_independent_at,
+                previous_independent_at=previous_exposure_at,
                 review_successes=review_successes, correct=correct,
                 assisted=assisted, mode=mode, fresh=fresh)
             # Foundation work and unverified transfer cannot clear due debt.
@@ -259,7 +264,7 @@ def record_attempt(*, result_id: str, user_id: str, course_id: str,
             lapses = (int(state['retention_lapses']) if state else 0) + int(
                 not correct and mode == 'review' and previous_independent_at is not None
                 and science_policy.is_delayed(previous_independent_at, now))
-            last_independent_at = (now.isoformat() if not assisted and fresh
+            last_independent_at = (now.isoformat() if not assisted and fresh and mode in ('challenge','review','transfer')
                                    else previous_independent_at)
             conn.execute('''INSERT INTO review_progress
                 (user_id,course_id,skill,review_successes,retention_lapses,last_independent_at)
@@ -426,9 +431,9 @@ def choose_next(user_id: str, course_id: str, problems: list[dict],
     interleaved = False
     if mode == 'challenge' and not focus_skill and not reviewing:
         with connect() as conn:
-            events = conn.execute('''SELECT skills_json,correct FROM attempt_events
+            events = conn.execute(f'''SELECT e.skills_json,e.correct FROM attempt_events e
                 WHERE user_id=? AND course_id=? AND assisted=0
-                AND mode='challenge' ORDER BY recorded_at DESC,rowid DESC LIMIT 120''',
+                AND mode='challenge' AND {analytics.FIRST_EVENT} ORDER BY recorded_at DESC,e.rowid DESC LIMIT 120''',
                 (str(user_id),str(course_id))).fetchall()
         skill_history = {}
         recent_skill = None
@@ -469,9 +474,9 @@ def choose_next(user_id: str, course_id: str, problems: list[dict],
             elif mode == 'transfer' and now_level <= earlier:
                 reason = 'Transfer practice: no harder question available in this skill'
     with connect() as conn:
-        event_rows=conn.execute('''SELECT skills_json,correct FROM attempt_events
+        event_rows=conn.execute(f'''SELECT e.skills_json,e.correct FROM attempt_events e
             WHERE user_id=? AND course_id=? AND assisted=0 AND mode IN ('challenge','review','transfer')
-            ORDER BY recorded_at DESC,rowid DESC LIMIT 80''',(str(user_id),str(course_id))).fetchall()
+            AND {analytics.FIRST_EVENT} ORDER BY recorded_at DESC,e.rowid DESC LIMIT 80''',(str(user_id),str(course_id))).fetchall()
     skill_name=skills_for(chosen)[0]
     performance=[bool(r['correct']) for r in reversed(event_rows)
                  if skill_name in json.loads(r['skills_json'])]
@@ -481,7 +486,7 @@ def choose_next(user_id: str, course_id: str, problems: list[dict],
             'learning_guidance': guidance,
             'question_type': chosen.get('question_type', 'mc'),
             'options': chosen.get('options'), 'difficulty_layer': chosen.get('difficulty_layer'),
-            'skills': skills_for(chosen), 'hint': meta.get('hint'),
+            'skills': skills_for(chosen),
             'graph': meta.get('graph'), 'reason': reason,
             'reviewing': reviewing, 'review_due_count': len(due_skills),
             'effective_mode': 'review' if reviewing else mode,
@@ -658,7 +663,7 @@ def forget_course(user_id: str, course_id: str, problem_ids: list[str] | None = 
     Context is keyed by user+problem (from legacy v0.3); use the owning
     OpenTutor course's IDs to remove only those records, not other courses.
     """
-    names = ('hint_exposures','attempts','attempt_events','saved_questions','answer_drafts','mastery','edges','propositions','diagnostic_probes','learning_queue',
+    names = ('hint_events','hint_exposures','attempts','attempt_events','saved_questions','answer_drafts','mastery','edges','propositions','diagnostic_probes','learning_queue',
              'debate_workspaces','debate_cards','debate_drills','review_progress')
     removed: dict[str,int] = {}
     with _LOCK,connect() as conn:

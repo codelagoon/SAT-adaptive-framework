@@ -1,6 +1,7 @@
 """Authenticated OpenTutor extension endpoints for Mastery Engine 2.0."""
 from __future__ import annotations
 
+import os
 import asyncio
 import json
 import shutil
@@ -46,6 +47,7 @@ class BookmarkRequest(BaseModel):
     saved: bool
 
 class DraftRequest(BaseModel):
+    base_result_id: str | None = Field(None,max_length=80)
     response: str = Field('',max_length=1500)
     reasoning: str = Field('',max_length=2500)
 
@@ -71,7 +73,7 @@ class SkipRepairRequest(BaseModel):
 
 @router.get('/health')
 async def health(user:User=Depends(get_current_user)):
-    return {'status':'ok','deeptutor_available':shutil.which('deeptutor') is not None,
+    return {'status':'ok','instance_id':os.environ.get('MASTERY_INSTANCE_ID'),'deeptutor_available':shutil.which('deeptutor') is not None,
             'data_file':str(engine.db_path()),'user_id':str(user.id)}
 
 @router.get('/courses/{course_id}/overview')
@@ -177,8 +179,11 @@ async def save_question_draft(course_id:uuid.UUID,problem_id:uuid.UUID,body:Draf
         PracticeProblem.course_id==course_id,PracticeProblem.source=='mastery_offline'))
     if problem is None:raise HTTPException(404,'Question not found')
     with engine.connect() as conn:
-        return workspace.save_draft(conn,str(user.id),str(course_id),str(problem_id),
-            body.response,body.reasoning)
+        try:
+            return workspace.save_draft(conn,str(user.id),str(course_id),str(problem_id),
+                body.response,body.reasoning,body.base_result_id)
+        except workspace.StaleDraftError as exc:
+            raise HTTPException(409,str(exc)) from exc
 
 @router.get('/courses/{course_id}/questions/{problem_id}/draft')
 async def get_question_draft(course_id:uuid.UUID,problem_id:uuid.UUID,
@@ -188,7 +193,8 @@ async def get_question_draft(course_id:uuid.UUID,problem_id:uuid.UUID,
         PracticeProblem.course_id==course_id,PracticeProblem.source=='mastery_offline'))
     if problem is None:raise HTTPException(404,'Question not found')
     with engine.connect() as conn:
-        return {'draft':workspace.read_draft(conn,str(user.id),str(course_id),str(problem_id))}
+        return {'draft':workspace.read_draft(conn,str(user.id),str(course_id),str(problem_id)),
+                'base_result_id':workspace.draft_revision(conn,str(user.id),str(course_id),str(problem_id))}
 
 @router.get('/courses/{course_id}/questions')
 async def browse_questions(course_id:uuid.UUID, skill:str='', difficulty:int=0,
@@ -236,7 +242,9 @@ async def get_solve_question(course_id:uuid.UUID,problem_id:uuid.UUID,
           PracticeProblem.is_archived==False))
     if p is None:raise HTTPException(404,'Question not found')
     meta=p.problem_metadata if isinstance(p.problem_metadata,dict) else {}
-    return {'id':str(p.id),'question':p.question,'question_type':p.question_type,
+    with engine.connect() as conn:
+        bookmarked=str(p.id) in workspace.saved_ids(conn,str(user.id),str(course_id))
+    return {'bookmarked':bookmarked,'id':str(p.id),'question':p.question,'question_type':p.question_type,
             'options':p.options,'difficulty_layer':p.difficulty_layer,
             'skills':p.knowledge_points or [],'graph':meta.get('graph'),
             'official':False,'source':'mastery_offline'}
@@ -294,6 +302,9 @@ async def next_problem(course_id:uuid.UUID, focus_skill:str='',mode:str='challen
                'options':p.options,'difficulty_layer':p.difficulty_layer,
                'knowledge_points':p.knowledge_points,'problem_metadata':p.problem_metadata} for p in result.scalars().all()]
     chosen=engine.choose_next(str(user.id),str(course_id),problems,focus_skill=focus_skill,mode=mode)
+    if chosen:
+        with engine.connect() as conn:
+            chosen['bookmarked']=chosen['id'] in workspace.saved_ids(conn,str(user.id),str(course_id))
     return {'question':chosen,'available':len(problems),'track':track_for(course)}
 
 
@@ -383,7 +394,7 @@ async def offline_help(course_id:uuid.UUID,problem_id:uuid.UUID,
     meta=p.problem_metadata if isinstance(p.problem_metadata,dict) else {}
     skills=p.knowledge_points if isinstance(p.knowledge_points,list) else []
     # Persist hint provenance before returning even if the client later sends assisted=false.
-    engine.mark_hint_exposure(str(user.id),str(course_id),str(problem_id))
+    engine.mark_hint_exposure(str(user.id),str(course_id),str(problem_id),skills)
     return {**lesson_for(skills,meta.get('hint')),'offline':True,
             'answer_hidden':True}
 

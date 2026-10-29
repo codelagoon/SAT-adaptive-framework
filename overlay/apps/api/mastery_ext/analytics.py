@@ -9,6 +9,29 @@ from datetime import datetime, timezone, timedelta
 import json
 import sqlite3
 
+FIRST_EVENT = '''NOT EXISTS (SELECT 1 FROM attempt_events prior
+    WHERE prior.user_id=e.user_id AND prior.course_id=e.course_id
+      AND prior.problem_id=e.problem_id AND prior.rowid<e.rowid)'''
+
+
+def parse_time(iso):
+    d=datetime.fromisoformat(iso)
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def latest_exposure_at(conn,user_id,course_id,skill,*,exclude_result_id,before):
+    times=[]
+    for row in conn.execute('''SELECT skills_json,recorded_at FROM attempt_events
+        WHERE user_id=? AND course_id=? AND result_id!=?''',(user_id,course_id,exclude_result_id)):
+        if skill in json.loads(row['skills_json']) and parse_time(row['recorded_at'])<=before:
+            times.append(parse_time(row['recorded_at']))
+    for row in conn.execute('SELECT skills_json,shown_at FROM hint_events WHERE user_id=? AND course_id=?',
+                            (user_id,course_id)):
+        tags=json.loads(row['skills_json'])
+        if (not tags or skill in tags) and parse_time(row['shown_at'])<=before:
+            times.append(parse_time(row['shown_at']))
+    return max(times).isoformat() if times else None
+
 
 def install(conn: sqlite3.Connection) -> None:
     conn.executescript('''
@@ -25,7 +48,19 @@ def install(conn: sqlite3.Connection) -> None:
     );
     CREATE INDEX IF NOT EXISTS ix_event_owner_date ON attempt_events(user_id,course_id,recorded_at);
     CREATE INDEX IF NOT EXISTS ix_event_owner_problem ON attempt_events(user_id,course_id,problem_id,recorded_at);
+    CREATE TABLE IF NOT EXISTS hint_events (
+      id TEXT PRIMARY KEY,user_id TEXT NOT NULL,course_id TEXT NOT NULL,
+      problem_id TEXT NOT NULL,skills_json TEXT NOT NULL,shown_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_hint_event_owner ON hint_events(user_id,course_id,shown_at);
     ''')
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='hint_exposures'").fetchone():
+        missing=conn.execute('''SELECT h.* FROM hint_exposures h WHERE NOT EXISTS
+            (SELECT 1 FROM hint_events e WHERE e.id='legacy:'||h.user_id||':'||h.course_id||':'||h.problem_id)''').fetchall()
+        for row in missing:
+            conn.execute('INSERT OR IGNORE INTO hint_events VALUES (?,?,?,?,?,?)',
+                ('legacy:'+row['user_id']+':'+row['course_id']+':'+row['problem_id'],
+                 row['user_id'],row['course_id'],row['problem_id'],'[]',row['shown_at']))
 
 
 def add_event(conn: sqlite3.Connection, *, result_id: str, user_id: str,
@@ -84,19 +119,20 @@ def report(conn: sqlite3.Connection, user_id: str, course_id: str,
     independent accuracy even when solved on a later attempt.
     """
     install(conn)
-    rows=[dict(r) for r in conn.execute('''SELECT * FROM attempt_events
-      WHERE user_id=? AND course_id=? ORDER BY recorded_at,rowid''',
+    rows=[dict(r) for r in conn.execute(f'''SELECT e.*,{FIRST_EVENT} AS first_for_question FROM attempt_events e
+      WHERE user_id=? AND course_id=? ORDER BY recorded_at,e.rowid''',
       (str(user_id),str(course_id))).fetchall()]
-    seen=set(); first=[]; eligible=[]; repeats=[]; guided=[]; groups=defaultdict(list)
+    first=[]; eligible=[]; repeats=[]; guided=[]; groups=defaultdict(list)
     delayed=[]; delayed_skills=defaultdict(list); transfer=[]
     prior_independent_by_skill={}; prior_exposure_by_skill={}
-    def parse_time(iso):
-        d=datetime.fromisoformat(iso)
-        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    hints=[dict(r) for r in conn.execute('SELECT skills_json,shown_at FROM hint_events WHERE user_id=? AND course_id=?',
+                                         (str(user_id),str(course_id)))]
+    hints.sort(key=lambda h:parse_time(h['shown_at']))
+    hint_index=0
+    unknown_help=None
     for row in rows:
         row['skills']=json.loads(row.pop('skills_json'))
-        fresh=row['problem_id'] not in seen
-        seen.add(row['problem_id'])
+        fresh=bool(row.pop('first_for_question'))
         independent=bool(fresh and not row['assisted'] and row['mode'] in ('challenge','review','transfer','exam'))
         if fresh:first.append(row)
         else:repeats.append(row)
@@ -105,8 +141,18 @@ def report(conn: sqlite3.Connection, user_id: str, course_id: str,
         if independent and row['mode']=='transfer':transfer.append(row)
         confirmed_delayed=False
         at=parse_time(row['recorded_at'])
+        while hint_index<len(hints) and parse_time(hints[hint_index]['shown_at'])<=at:
+            h=hints[hint_index]; tags=json.loads(h['skills_json']); when=parse_time(h['shown_at'])
+            if tags:
+                for tag in tags:prior_exposure_by_skill[tag]=when
+            else:
+                # Legacy help without skill provenance conservatively applies
+                # to its owning course; never manufacture delayed evidence.
+                unknown_help=when
+            hint_index+=1
         for skill in row['skills']:
             last=prior_exposure_by_skill.get(skill)
+            if unknown_help is not None:last=max(last,unknown_help) if last else unknown_help
             earlier_independent=prior_independent_by_skill.get(skill)
             # Only a new, independently solved, delayed review is retention evidence.
             if (independent and row['mode']=='review'
@@ -144,6 +190,7 @@ def report(conn: sqlite3.Connection, user_id: str, course_id: str,
         return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).timestamp()
     this_week=[r for r in eligible if now.timestamp()-604800 <= ts(r) <= now.timestamp()]
     last_week=[r for r in eligible if now.timestamp()-1209600 <= ts(r) < now.timestamp()-604800]
+    repeated_ids={r['result_id'] for r in repeats}
     return {
       'sample_count':len(rows),'first_attempts':_rate(first),
       'delayed_retention':_rate(delayed),
@@ -151,6 +198,7 @@ def report(conn: sqlite3.Connection, user_id: str, course_id: str,
       'independent_transfer':_rate(transfer),
       'mastery_evidence_by_skill':evidence_by_skill,
       'independent_first_attempts':_rate(eligible),'assisted_attempts':_rate(guided),
+      'other_attempts':_rate([r for r in rows if r['assisted'] or r['result_id'] in repeated_ids]),
       'repeat_attempts':_rate(repeats),
       'legacy_unverified_attempts':_rate([r for r in rows if r['mode']=='legacy_unverified']),
       'timing':{'independent_median_ms':_median(times),'correct_median_ms':_median(good),

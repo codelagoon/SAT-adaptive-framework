@@ -16,6 +16,8 @@ final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     private var window: NSWindow!
     private var web: WKWebView!
     private var server: Process?
+    private let runtimeInstanceID = UUID().uuidString
+    private var expectedDataFile: String?
     private var attempts = 0
     private var launchFailure: String?
 
@@ -82,6 +84,9 @@ final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let oldPath = env["PATH"] ?? "/usr/bin:/bin"
         env["PATH"] = "\(installRoot)/deeptutor-venv/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:\(oldPath)"
         env["MASTERY_DATA_DIR"] = env["MASTERY_DATA_DIR"] ?? "\(home)/Library/Application Support/MasteryEngine2"
+        env["MASTERY_INSTANCE_ID"] = runtimeInstanceID
+        expectedDataFile = URL(fileURLWithPath:env["MASTERY_DATA_DIR"]!,isDirectory:true)
+            .appendingPathComponent("mastery.sqlite3").resolvingSymlinksInPath().path
         task.environment = env
         task.standardOutput = log
         task.standardError = log
@@ -109,11 +114,14 @@ final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 guard let r=response as? HTTPURLResponse, r.statusCode == 200,
                       let data=data,
                       let json=try? JSONSerialization.jsonObject(with:data) as? [String:Any],
-                      (json["status"] as? String) == "ok" else {return false}
+                      (json["status"] as? String) == "ok",
+                      (json["instance_id"] as? String) == self.runtimeInstanceID,
+                      let file=json["data_file"] as? String,
+                      URL(fileURLWithPath:file).resolvingSymlinksInPath().path == self.expectedDataFile else {return false}
                 return true
             }()
             DispatchQueue.main.async {
-                if healthy {
+                if healthy, self.server?.isRunning == true {
                     self.web.load(URLRequest(url:URL(string:"http://127.0.0.1:18766/mastery")!))
                 } else {
                     DispatchQueue.main.asyncAfter(deadline:.now()+1) {self.checkServer()}

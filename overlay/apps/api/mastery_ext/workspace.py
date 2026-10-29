@@ -40,14 +40,32 @@ def saved_ids(conn,user_id:str,course_id:str) -> set[str]:
                                       (user_id,course_id)).fetchall()}
 
 
-def save_draft(conn,user_id:str,course_id:str,problem_id:str,response:str,reasoning:str='') -> dict:
+class StaleDraftError(ValueError):
+    pass
+
+
+def draft_revision(conn,user_id:str,course_id:str,problem_id:str) -> str | None:
+    row=conn.execute('''SELECT result_id FROM attempt_events
+        WHERE user_id=? AND course_id=? AND problem_id=? ORDER BY rowid DESC LIMIT 1''',
+        (user_id,course_id,problem_id)).fetchone()
+    return row[0] if row else None
+
+
+def save_draft(conn,user_id:str,course_id:str,problem_id:str,response:str,reasoning:str='',
+               base_result_id:str | None=None) -> dict:
     install(conn)
     if len(response)>1500 or len(reasoning)>2500:raise ValueError('Draft exceeds size limit')
     now=datetime.now(timezone.utc).isoformat()
-    conn.execute('''INSERT INTO answer_drafts(user_id,course_id,problem_id,response,reasoning,saved_at)
-      VALUES (?,?,?,?,?,?) ON CONFLICT(user_id,course_id,problem_id) DO UPDATE SET
+    # One atomic conditional write: a grade committed after this editor loaded
+    # invalidates its draft, including delayed writes from another browser tab.
+    cursor=conn.execute('''INSERT INTO answer_drafts(user_id,course_id,problem_id,response,reasoning,saved_at)
+      SELECT ?,?,?,?,?,? WHERE COALESCE((SELECT result_id FROM attempt_events
+        WHERE user_id=? AND course_id=? AND problem_id=? ORDER BY rowid DESC LIMIT 1),'')=COALESCE(?,'')
+      ON CONFLICT(user_id,course_id,problem_id) DO UPDATE SET
       response=excluded.response,reasoning=excluded.reasoning,saved_at=excluded.saved_at''',
-      (user_id,course_id,problem_id,response,reasoning,now))
+      (user_id,course_id,problem_id,response,reasoning,now,user_id,course_id,problem_id,base_result_id))
+    if cursor.rowcount != 1:
+        raise StaleDraftError('Draft is stale: a newer answer was graded. Reload before editing.')
     return {'saved':True,'problem_id':problem_id,'saved_at':now}
 
 
