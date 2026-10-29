@@ -24,6 +24,7 @@ function keyFor(id) {
 }
 (async () => {
   let browser;
+  let activePage;
   try {
     const health = await api('/mastery/health');
     assert.equal(fs.realpathSync(path.dirname(health.data_file)), fs.realpathSync(data));
@@ -38,15 +39,19 @@ function keyFor(id) {
     browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE });
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage(), errors = [];
+    activePage = page;
     page.on('pageerror', e => errors.push(String(e)));
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     async function visit(route, heading) {
       await page.goto(base + route, { waitUntil: 'networkidle' });
       if (heading) await page.getByRole('heading', { name: heading, exact: true }).waitFor();
-      assert.equal(await page.getByRole('alert').count(), 0, await page.locator('body').innerText());
+      assert.equal(await page.locator('main').getByRole('alert').count(), 0, await page.locator('body').innerText());
       assert.deepEqual(errors, [], 'Browser console/page errors');
     }
     await visit(`/mastery?courseId=${course}`, 'Study queue');
+    await page.getByRole('button', {name:/TN-002/}).click();
+    const recommendation = page.getByRole('complementary', {name:'Selected recommendation details'}).getByRole('link');
+    assert(new URL(await recommendation.getAttribute('href'), base).pathname.endsWith('/solve'), 'Selecting Solve block must open Solve, not the first Learn block');
     await page.getByRole('link', { name: 'Question Bank', exact: true }).click();
     await page.getByRole('heading', { name: 'Find the right questions.', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Difficulty', exact: true }).click();
@@ -122,6 +127,13 @@ function keyFor(id) {
     assert.deepEqual(errors, []);
     fs.writeFileSync(path.join(shots, 'result.json'), JSON.stringify({ status: 'pass', user_id: health.user_id, viewports: 3, screenshots: 18, consoleErrors: errors, analytics: report }, null, 2));
     console.log('PASS: real Tenet routes, filters, drafts/reload, bookmarks, server hints, grading, diagnosis, independent analytics, course isolation; 18 screenshots and accessibility trees');
+  } catch (error) {
+    if (activePage) {
+      await activePage.screenshot({ path: path.join(shots, 'failure.png') }).catch(() => {});
+      fs.writeFileSync(path.join(shots, 'failure.html'), await activePage.content().catch(() => ''));
+      fs.writeFileSync(path.join(shots, 'failure.aria.yml'), await activePage.locator('body').ariaSnapshot().catch(() => ''));
+    }
+    throw error;
   } finally {
     if (browser) await browser.close();
     for (const c of courses) await api(`/courses/${c}`, 'DELETE');

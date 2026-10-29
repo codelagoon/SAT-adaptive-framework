@@ -17,6 +17,9 @@ Input SHA-256 verified `b587011df54dea8b3e9d53c44518fee7131b9b42d98a5d0712f6f379
 - Ruling: use this STATUS ledger, per repository instructions; supplied science implementation plan is already implemented inside ZIP and is not an integration plan. No duplicate plan system.
 - Visual lock: supplied Neutral Ink source and neutral-ink screenshots; fixed viewport, 76px rail / 56px dock, five nav destinations, separate focus Solve, custom accessible filters. Existing product decisions authorize direct implementation, no design re-selection.
 
+## Implementation checkpoint
+`06b58c1` pushed; Apple Silicon run [40863435034](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40863435034) in progress.
+
 ## Evidence
 - Protected base rechecked: **88 passed, 2 skipped** (`../tenet-foundation-baseline.log`); imported feature tests before implementation fail because workspace and analytics modules are missing.
 - Feature tree copied: **181 passed, 2 skipped** excluding browser preview tests. Full suite collection awaits Playwright download. Browser fixture paths updated for managed Chromium or explicit local browser.
@@ -30,3 +33,9 @@ All integration, browser, native and distribution gates remain pending until act
 
 ## Next action
 Read full source-suite and production-build output; repair observed failures before proceeding to real-browser journeys.
+
+## Current verification diagnostics
+- Actual foundation-engine DB seeded with two users/three courses, copied using SQLite backup, migrated twice: legacy attempts/mastery/notes/queues and pending contexts preserved; migrated events remain legacy-unverified. Original file SHA unchanged. Command `../release-venv/bin/python ../tenet-handoff/verify_foundation_copy.py`; output `../tenet-migration.log`.
+- Fresh local build reached pinned upstream/overlay then managed Python download failed after 3 retries/415s (external timeout). Python Playwright wheel failed after 6 attempts (18.9/43.2 MB). No unproductive repeat of either download.
+- Local recovery uses read-only existing relocatable Python 3.11.18/pylibs/official Node caches from installed app in a separate build folder, followed by the original production Next/Swift/DMG steps. Script `../tenet-resume-build.sh`; log `../tenet-local-build.log`. Fresh CI executes original full build independently.
+- Native preflight: `sandbox-exec` profile with external egress denied/loopback allowed parses successfully. Full network-isolation/GUI test remains pending. Accessibility permission false; screen capture true.
