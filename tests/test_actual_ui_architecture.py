@@ -52,8 +52,10 @@ def test_bank_filters_and_workflows():
 def test_visual_and_accessibility_contract():
     for phrase in ('aria-current','aria-label','role="status"','fieldset','legend','input type="radio"','disabled={!!grade||busy}'):
         assert phrase in UI
-    assert 'max-width:700px' in CSS and 'max-width:1060px' in CSS
-    assert 'overflow-x:auto' in CSS
+    assert '.solveLayout{' in CSS and 'max-width:960px' in CSS
+    assert 'max-width:68ch' in CSS  # Comfortable reading measure, not old layout widths.
+    assert 'overflow-x:hidden' in CSS
+    assert 'color-scheme:light' in CSS and 'color-scheme:dark' in CSS
     assert 'min-width:0' in CSS
     assert 'Question Bank' in UI
     assert 'This is not an official Bluebook or ACT test' in UI

@@ -83,6 +83,8 @@ FONT_CONFIG='''const spaceGrotesk = Space_Grotesk({
 
 '''
 FONT_CLASS='className={spaceGrotesk.variable}'
+THEME_PROVIDER_ANCHOR='<ThemeProvider attribute="class" defaultTheme="system" enableSystem>'
+THEME_PROVIDER_PATCH='<ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>'
 FONT_CSS_ANCHOR=':root {\n  --font-geist-sans: var(--font-space-grotesk), '
 FONT_CSS_PATCH=':root {\n  --font-space-grotesk: "Avenir Next", system-ui, sans-serif;\n  --font-geist-sans: var(--font-space-grotesk), '
 FASTSETUP_ANCHOR='log "  Installing Python dependencies ..."\n"${PIP_BIN}" install -q -r "${API_DIR}/requirements-core.txt"\nlog "  Done"'
@@ -115,6 +117,7 @@ def apply(target:Path):
         ('apps/web/src/app/layout.tsx',FONT_IMPORT,''),
         ('apps/web/src/app/layout.tsx',FONT_CONFIG,''),
         ('apps/web/src/app/layout.tsx',FONT_CLASS,'className="font-sans"'),
+        ('apps/web/src/app/layout.tsx',THEME_PROVIDER_ANCHOR,THEME_PROVIDER_PATCH),
         ('apps/web/src/app/globals.css',FONT_CSS_ANCHOR,FONT_CSS_PATCH),
         ('scripts/quickstart.sh',FASTSETUP_ANCHOR,FASTSETUP_PATCH),
         ('scripts/quickstart.sh',WEB_BIND_ANCHOR,WEB_BIND_PATCH),

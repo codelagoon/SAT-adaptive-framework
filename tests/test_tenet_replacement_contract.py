@@ -25,11 +25,11 @@ def test_old_route_redirects_without_rendering_previous_ui():
 
 def test_neutral_ink_tokens_drive_all_workspaces():
     css = (APP/'workspace-ui.module.css').read_text()
-    assert '--tenet-bg:#131415' in css
-    assert '--tenet-sidebar:#101113' in css
+    assert ':global(.dark) .shell' in css
+    assert '--canvas:#fff' in css and '--panel:#fff' in css
     assert '--tenet-surface:#1b1c1f' in css
     assert '--tenet-accent:#b2b8c2' in css
-    assert '--tenet-accent-muted:#31353b' in css
+    assert 'background:var(--panel)' in css
     assert 'height:100dvh' in css
     # The global accent must no longer be Graphite/Steel Blue.
     assert '--tenet-accent:#87addb' not in css

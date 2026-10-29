@@ -2,7 +2,7 @@ import Cocoa
 import WebKit
 
 @main
-final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate {
+final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScriptMessageHandler {
     private static var activeDelegate: MasteryApp?
 
     static func main() {
@@ -31,9 +31,11 @@ final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         window.minSize = NSSize(width: 1050, height: 650)
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
+        config.userContentController.add(self, name: "tenetAppearance")
         web = WKWebView(frame: rect, configuration: config)
         web.navigationDelegate = self
         window.contentView = web
+        applyAppearance(UserDefaults.standard.string(forKey:"TenetAppearance") ?? "system")
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         showWaiting("Starting your learning workspace…")
@@ -46,11 +48,31 @@ final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                           .replacingOccurrences(of: "<", with: "&lt;")
         web.loadHTMLString("""
         <html><head><meta name='viewport' content='width=device-width'><style>
-        body{margin:0;background:#0c1018;color:#e9edf4;font-family:-apple-system,system-ui;
+        :root{color-scheme:light dark}
+        body{margin:0;background:#fff;color:#17212f;font-family:-apple-system,system-ui;
         display:grid;place-items:center;height:100vh}main{max-width:620px;padding:35px;text-align:center}
-        h1{font-size:28px;letter-spacing:-.6px}p{line-height:1.6;color:#98a9bf;font-size:14px}
+        h1{font-size:28px;letter-spacing:-.6px}p{line-height:1.6;color:#526174;font-size:14px}
+        @media(prefers-color-scheme:dark){body{background:#1b1c1f;color:#f0f2f5}p{color:#b2bac7}}
         </style></head><body><main><h1>Tenet</h1><p>\(safe)</p></main></body></html>
         """, baseURL: nil)
+    }
+
+    private func applyAppearance(_ preference: String) {
+        window.appearance = preference == "system" ? nil : NSAppearance(named: preference == "dark" ? .darkAqua : .aqua)
+        let dark = window.effectiveAppearance.bestMatch(from:[.darkAqua,.aqua]) == .darkAqua
+        window.backgroundColor = NSColor(calibratedWhite:dark ? 0.106 : 1, alpha:1)
+        web?.underPageBackgroundColor = window.backgroundColor
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        // Only the owning loopback main document can set this display preference.
+        guard message.name == "tenetAppearance", message.frameInfo.isMainFrame,
+              let origin = message.frameInfo.request.url, origin.scheme == "http",
+              origin.host == "127.0.0.1", origin.port == 18766,
+              let body = message.body as? [String:String], let preference = body["appearance"],
+              ["light","dark","system"].contains(preference) else {return}
+        UserDefaults.standard.set(preference, forKey:"TenetAppearance")
+        applyAppearance(preference)
     }
 
     private func startRuntime() {

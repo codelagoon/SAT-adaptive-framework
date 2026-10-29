@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const assert = require('node:assert/strict');
+const {captureState,verifyUX}=require('./verify_tenet_ux.cjs');
 const base = process.env.TENET_E2E_URL || 'http://127.0.0.1:18766';
 const data = process.env.MASTERY_DATA_DIR;
 const shots = path.resolve(process.env.TENET_SCREENSHOTS || 'build/ui-evidence');
@@ -29,15 +30,15 @@ function keyFor(id) {
     const health = await api('/mastery/health');
     assert.equal(fs.realpathSync(path.dirname(health.data_file)), fs.realpathSync(data));
     assert(health.user_id, 'Real local learner identity required');
-    for (const track of ['SAT Math', 'Physics']) {
+    for (const track of ['SAT Math', 'Physics', 'SAT Reading & Writing']) {
       const c = await api('/courses/', 'POST', { name: track, description: 'Disposable Tenet browser verification', metadata: { mastery_track: track } });
       courses.push(c.id); await api(`/mastery/courses/${c.id}/starter-questions`, 'POST');
     }
     const course = courses[0], prefix = `/mastery/courses/${course}`;
     const questions = (await api(`${prefix}/questions?limit=30`)).questions;
     assert(questions.length >= 3);
-    browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE });
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE, args: ['--disable-gpu'], timeout: 45000 });
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'light' });
     const page = await context.newPage(), errors = [];
     activePage = page;
     page.on('pageerror', e => errors.push(String(e)));
@@ -74,6 +75,7 @@ function keyFor(id) {
       await page.getByRole('textbox', { name: 'Optional reasoning' }).fill('Tenet browser persistence check');
       await page.waitForTimeout(900);
       assert.equal((await api(`${prefix}/questions/${item.id}/draft`)).draft.response, answer);
+      await page.getByText('Draft saved',{exact:true}).waitFor();
       await page.reload({ waitUntil: 'networkidle' });
       await page.getByRole('heading', { name: item.question, exact: true }).waitFor();
       assert(await page.locator(`input[type=radio][value="${answer}"]`).isChecked(), 'Draft must survive reload');
@@ -82,6 +84,7 @@ function keyFor(id) {
         assert((await api(`${prefix}/questions?status=bookmarked`)).questions.some(q => q.id === item.id));
         await page.getByRole('button', { name: 'Need a hint?', exact: true }).click();
         await page.getByText('Hinted work is recorded separately', { exact: false }).waitFor();
+        await captureState(page,'hint-and-selected-answer',shots);
       }
       let releaseDraft;
       if (!raceExercised) {
@@ -105,6 +108,8 @@ function keyFor(id) {
         } finally {releaseDraft()}
         await click;
         await page.getByRole('heading',{name:correct?'Correct':'Not yet',exact:true}).waitFor();
+        await page.getByText('Answer recorded',{exact:true}).waitFor();
+        await captureState(page,'correct-feedback',shots);
         page.off('request',onRequest);
         await page.unroute(`**/questions/${item.id}/draft`);
         raceExercised=true;
@@ -117,6 +122,7 @@ function keyFor(id) {
       await page.getByRole('button', { name: 'Check answer', exact: true }).click();
       const grade = await (await response).json(); assert.equal(grade.is_correct, correct);
       await page.getByRole('heading', { name: correct ? 'Correct' : 'Not yet', exact: true }).waitFor();
+      await captureState(page,correct?'independent-correct':'incorrect-feedback',shots);
       await page.waitForTimeout(900);
       assert.equal((await api(`${prefix}/questions/${item.id}/draft`)).draft, null, 'Autosave must never resurrect a graded draft');
       assert.deepEqual(errors, []);
@@ -144,29 +150,13 @@ function keyFor(id) {
     await page.getByRole('link', { name: 'Find practice questions', exact: false }).click();
     await page.getByRole('heading', { name: 'Find the right questions.', exact: true }).waitFor();
     assert(await page.getByRole('textbox', { name: 'Filter skill', exact: true }).inputValue());
-    const routes = [['', 'Study queue'], ['/learn', 'Learn the skills.'], ['/bank', 'Find the right questions.'],
-      ['/solve', null], ['/tests', 'Practice under pressure.'], ['/analytics', 'Your performance, explained.']];
-    for (const [width, height] of [[1440, 900], [1280, 800], [390, 844]]) {
-      await page.setViewportSize({ width, height });
-      for (const [route, heading] of routes) {
-        await visit(`/mastery${route}?courseId=${course}`, heading);
-        if (route === '/solve') await page.locator('input[type=radio]').first().waitFor();
-        const dimensions = await page.evaluate(() => ({ w: document.documentElement.scrollWidth, h: document.documentElement.scrollHeight, vw: innerWidth, vh: innerHeight }));
-        assert(dimensions.w <= width + 1 && dimensions.h <= height + 1, `${route}: ${JSON.stringify(dimensions)}`);
-        if (route !== '/solve') {
-          assert.equal(await page.getByRole('navigation', { name: 'Study sections' }).getByRole('link').count(), 5);
-          if (width > 760) assert((await page.getByRole('complementary', { name: 'Primary navigation' }).boundingBox()).width <= 80);
-        }
-        await page.screenshot({ path: path.join(shots, `${route.slice(1) || 'home'}-${width}.png`) });
-        fs.writeFileSync(path.join(shots, `${route.slice(1) || 'home'}-${width}.aria.yml`), await page.locator('body').ariaSnapshot());
-      }
-    }
+    const design=await verifyUX(page,{base,course,physics:courses[1],reading:courses[2],api,shots});
     await visit(`/mastery/legacy?courseId=${course}`); assert.equal(new URL(page.url()).pathname, '/mastery');
     await visit(`/mastery/analytics?courseId=${courses[1]}`, 'Your performance, explained.');
     assert.equal((await api(`/mastery/courses/${courses[1]}/analytics`)).sample_count, 0);
     assert.deepEqual(errors, []);
-    fs.writeFileSync(path.join(shots, 'result.json'), JSON.stringify({ status: 'pass', user_id: health.user_id, viewports: 3, screenshots: 18, consoleErrors: errors, analytics: report }, null, 2));
-    console.log('PASS: real Tenet routes, filters, drafts/reload, bookmarks, server hints, grading, diagnosis, independent analytics, course isolation; 18 screenshots and accessibility trees');
+    fs.writeFileSync(path.join(shots, 'result.json'), JSON.stringify({ status: 'pass', user_id: health.user_id, viewports: design.viewports, themes: design.themes, screenshots: fs.readdirSync(shots).filter(name=>name.endsWith('.png')).length, consoleErrors: errors, analytics: report }, null, 2));
+    console.log('PASS: real Tenet routes, filters, drafts/reload, bookmarks, server hints, grading, diagnosis, independent analytics, course isolation; both themes, five viewports, contrast, keyboard, large text, motion, graph and persistence checks');
   } catch (error) {
     if (activePage) {
       await activePage.screenshot({ path: path.join(shots, 'failure.png') }).catch(() => {});

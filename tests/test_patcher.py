@@ -16,7 +16,7 @@ def fixture_source(tmp_path):
       'apps/api/routers/courses_crud.py':f'begin\n{installer.DELETE_COURSE_ANCHOR}\nend',
       'apps/web/next.config.ts':f'const nextConfig: NextConfig = {{\n  async rewrites() {{ return {{ beforeFiles:[\n{installer.WEB_COURSE_ANCHOR}\n] }}; }}\n}}; export default nextConfig;',
         'apps/web/src/app/_components/dashboard-sidebar.tsx':f'begin\n{installer.SIDEBAR_ANCHOR}\nend',
-      'apps/web/src/app/layout.tsx':f'{installer.FONT_IMPORT}\n{installer.FONT_CONFIG}\n<html {installer.FONT_CLASS}>',
+      'apps/web/src/app/layout.tsx':f'{installer.FONT_IMPORT}\n{installer.FONT_CONFIG}\n<html {installer.FONT_CLASS}>\n{installer.THEME_PROVIDER_ANCHOR}',
       'scripts/quickstart.sh':f'#!/bin/bash\n{installer.FASTSETUP_ANCHOR}\n{installer.WEB_BIND_ANCHOR}\n',
       'apps/web/src/app/globals.css':f'{installer.FONT_CSS_ANCHOR}sans-serif;\n',
     }
@@ -33,6 +33,7 @@ def test_overlay_patches_and_is_idempotent(tmp_path):
     assert 'Mastery Engine 2.0' in (root/'apps/web/src/app/_components/dashboard-sidebar.tsx').read_text()
     assert (root/'apps/web/src/app/mastery/page.tsx').exists()
     assert '/api/courses/' in (root/'apps/web/next.config.ts').read_text()
+    assert (root/'apps/web/src/app/layout.tsx').read_text().count('disableTransitionOnChange') == 1
 
 def test_fails_closed_before_modifications(tmp_path):
     root=fixture_source(tmp_path)

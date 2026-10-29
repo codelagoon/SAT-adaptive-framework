@@ -29,7 +29,7 @@ def test_sidebar_is_compact_floating_pill_without_labels():
     assert '.dock{' in css
     assert 'border-radius:24px' in css
     assert '.side{width:76px;flex:0 0 76px' in css
-    assert '.navItem::after{' in css
+    assert '.navItem::after' in css  # Brand/nav may share the same tooltip rule.
     assert '.navItem:focus-visible::after' in css
     assert '.focusMode .side{display:none}' in css
 
