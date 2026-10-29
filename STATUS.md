@@ -9,6 +9,13 @@
 - Isolated worktree: `/Users/george/Documents/Codex/2026-10-28/x20/work/tenet-integrated`. Outputs: `/Users/george/Documents/Codex/2026-10-28/x20/outputs`.
 - Feature ZIP reconciled onto the exact Mac foundation; native build/installer/runtime retained. Full Neutral Ink route tree and backend analytics/workspace/curriculum/science policy imported.
 
+## StudyOS additions received — October 29
+- User clarified: add the supplied StudyOS package and prompt to the current work; do not replace the Tenet scope or restart from an older branch. Added requirements: [docs/STUDYOS_ADDITIONS.md](docs/STUDYOS_ADDITIONS.md).
+- Full inputs staged locally under ignored `private/studyos/2026-10-29/`; original workbook, supporting records, and the separately supplied prompt preserved read-only. ZIP CRC passed; all 24 manifest entries match byte counts and SHA-256; 25 archive files staged. Catalog contains 20 courses and declares 189 topic seeds.
+- Added scope covers safe full-course/evidence import, direct Home-to-Solve persisted sets, adaptive selection and verified scheduling, sourced lesson/video content, and complete light/dark themes. Existing implementation, Mac foundation, original tools, data-preservation rules, and release gates remain in force. Older branch references inside the supplied documents are historical.
+- Repository visibility verified PUBLIC: learner records, grades, workbook, teacher materials, and full prompts remain ignored/local. Only the sanitized addendum, ignore rule, and this ledger are tracked. No live learner database import or feature implementation performed in this attachment-addition step; these requirements remain pending, not verified features.
+- Validation: archive integrity/manifest/JSON/catalog checks, ignored-input and staged-file checks, `git diff --check`. Runtime code unchanged; the application verification below still applies to code a40b32e. Continue from the existing next action at the end of this ledger with the new requirements included.
+
 ## Latest complete verification
 [Apple Silicon run 40915353521](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40915353521), exact code a40b32e: **SUCCESS**, 8m34s. **197 passed, 2 skipped in 43.82s**; full Next/TypeScript build; eslint **0 errors, 1 warning**; real production browser journeys; mounted/relocated DMG; restart/deletion isolation; **post-use signature valid**.
 
