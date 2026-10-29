@@ -18,6 +18,8 @@ def record(user,course,problem,result):
     engine.add_proposition(user,course,'Claims should be justified',['An example'])
     engine.put_edges(user,course,[{'prerequisite':'Arithmetic','dependent':'Algebra'}])
     engine.store_probe_result(user,course,problem,result,'probe-123','Linear equations','B',False)
+    engine.save_debate_workspace(user,course,'A sufficiently specific debate resolution')
+    engine.add_debate_card(user,course,'PRO','A complete argument claim',source='A source')
 
 
 def test_private_records_purged_for_only_deleted_course():
@@ -31,6 +33,8 @@ def test_private_records_purged_for_only_deleted_course():
     assert engine.summary('user','delete-me')['diagnostic_checks']==[]
     assert engine.summary('user','delete-me')['learning_phases']==[]
     assert engine.summary('user','delete-me')['edges']==[]
+    assert engine.debate_workspace('user','delete-me')['cards']==[]
+    assert engine.debate_workspace('user','keep-me')['cards']
     assert engine.summary('user','keep-me')['skills']
     assert engine.summary('other','delete-me')['skills']
     with engine.connect() as db:

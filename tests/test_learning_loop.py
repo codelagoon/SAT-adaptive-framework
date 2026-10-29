@@ -82,7 +82,9 @@ def test_streak_schedule_and_reset():
     state=engine.summary('u','course')['skills'][0]
     assert state['streak']==3
     due=datetime.fromisoformat(state['due_at'])
-    assert timedelta(days=6) < due-datetime.now(timezone.utc) < timedelta(days=8)
+    # Three immediate correct acquisitions do not count as three successful
+    # *spaced* reviews. The initial delayed review stays due in one day.
+    assert timedelta(hours=23) < due-datetime.now(timezone.utc) < timedelta(hours=25)
     attempt('wrong',5,'Reading',False)
     state=engine.summary('u','course')['skills'][0]
     assert state['streak']==0

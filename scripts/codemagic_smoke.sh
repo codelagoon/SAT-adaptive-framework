@@ -84,7 +84,7 @@ PY
 }
 start_services
 curl --noproxy '*' -fsS --max-time 20 'http://127.0.0.1:18766/mastery' > "$SCRATCH/page.html"
-grep -q 'Learn where it gets difficult' "$SCRATCH/page.html" || {
+grep -q 'Loading your study workspace' "$SCRATCH/page.html" || {
   echo 'Mastery learner UI failed to render on bundled Next server' >&2; exit 1;
 }
 "$RES/python/bin/python3.11" "$SOURCE/scripts/verify_bundled_runtime.py" exercise "$SCRATCH/state.json"
@@ -92,6 +92,10 @@ stop_services
 start_services
 "$RES/python/bin/python3.11" "$SOURCE/scripts/verify_bundled_runtime.py" recover "$SCRATCH/state.json"
 "$RES/python/bin/python3.11" "$SOURCE/scripts/verify_bundled_runtime.py" cleanup "$SCRATCH/state.json"
+if [[ "${TENET_UI_E2E:-0}" == 1 ]]; then
+  export TENET_PYTHON="$RES/python/bin/python3.11"
+  "$RES/node" "$SOURCE/scripts/verify_tenet_ui.cjs"
+fi
 stop_services
 echo 'PASS: installed bundled runtime, restart recovery and course deletion isolation'
 echo 'NOT VERIFIED: physical network disconnection, Cocoa/WebKit interaction, Gatekeeper, notarization or updates'

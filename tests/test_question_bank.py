@@ -30,8 +30,11 @@ def test_subject_mapping():
 
 
 def test_worksheet_free_interface():
-    ui=(ROOT/'overlay/apps/web/src/app/mastery/page.tsx').read_text()
+    base=ROOT/'overlay/apps/web/src/app/mastery'
+    ui=(base/'workspace-ui.tsx').read_text()
+    legacy=(ROOT/'docs/archive/mastery-v09-debate-page.tsx.txt').read_text()
+    redirect=(base/'legacy/page.tsx').read_text()
     assert 'Upload a worksheet' not in ui
-    assert 'Start practice' in ui
-    assert 'starter-questions' in ui
-    assert 'Pick a subject' in ui
+    assert 'starter-questions' in ui and 'Question Bank' in ui
+    assert 'Start practice' in legacy and 'Pick a subject' in legacy
+    assert 'redirect("/mastery")' in redirect

@@ -188,11 +188,14 @@ def test_independent_checks_of_new_multistep_families():
 
 def test_exact_attempt_scoping_is_wired_into_grading_and_diagnosis():
     api=(ROOT/'overlay/apps/api/mastery_ext/router.py').read_text()
-    ui=(ROOT/'overlay/apps/web/src/app/mastery/page.tsx').read_text()
+    ui=(ROOT/'docs/archive/mastery-v09-debate-page.tsx.txt').read_text()
+    new_ui=(ROOT/'overlay/apps/web/src/app/mastery/workspace-ui.tsx').read_text()
     patcher=(ROOT/'scripts/apply_overlay.py').read_text()
     assert 'PracticeResult.id==attempt_id' in api
     assert 'PracticeResult.id==body.attempt_id' in api
     assert 'attempt_id=${result.result_id}' in ui
     assert 'attempt_id:grade?.result_id' in ui
+    assert 'attempt_id=${result.result_id}' in new_ui
+    assert 'attempt_id:grade.result_id' in new_ui
     assert 'result_id=str(pr.id)' in patcher
     assert 'result_id: str | None = None' in patcher

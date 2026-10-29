@@ -87,3 +87,18 @@ def test_reasoning_propositions_are_persistent_and_scoped():
     assert len(engine.list_propositions('u1','c1'))==1
     assert engine.list_propositions('u2','c1')==[]
     with pytest.raises(ValueError):engine.add_proposition('u1','c1','A',[])
+
+def test_debate_workspace_cards_drills_and_fact_sheet_are_scoped():
+    engine.save_debate_workspace('u1','c1','European members of NATO should ratify the TPNW','November 14, 2026')
+    card=engine.add_debate_card('u1','c1','PRO','Ratification strengthens the nuclear taboo',
+        warrant='Norms affect state behavior',impact='Lower use risk',evidence='Study finding',
+        source='Author, 2025',counter='Deterrence prevents war',response='The ban targets possession, not conventional defense')
+    drill=engine.add_debate_drill('u1','c1',card['claim'],'Deterrence has escalation costs',27,card['id'])
+    data=engine.debate_workspace('u1','c1')
+    assert data['workspace']['debate_date']=='November 14, 2026'
+    assert data['cards'][0]['side']=='PRO' and data['drills'][0]['elapsed_seconds']==27
+    sheet=engine.debate_fact_sheet('u1','c1')
+    assert 'PRO' in sheet and 'Author, 2025' in sheet and 'They may say:' in sheet
+    assert engine.debate_workspace('u2','c1')['cards']==[]
+    with pytest.raises(ValueError):engine.add_debate_card('u1','c1','MAYBE','Invalid side')
+    with pytest.raises(ValueError):engine.add_debate_drill('u1','c1','Prompt','Answer',0)

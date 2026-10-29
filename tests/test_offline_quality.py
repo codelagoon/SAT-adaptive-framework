@@ -126,13 +126,17 @@ def test_patcher_prevents_offline_model_calls():
 
 
 def test_frontend_shows_graph_and_study_offline():
-    page=(ROOT/'overlay/apps/web/src/app/mastery/page.tsx').read_text()
-    assert 'offline-help' in page and 'expand' in page
-    assert 'ProblemGraph' in page
-    assert 'question.reason' in page
-    assert 'offline-diagnosis' in page
-    assert 'Offline ready' in page
-    assert 'Start practice' in page
+    # The new UI replaces the previous all-in-one page; its source is archived
+    # for future debate-workspace porting, not exposed as an active UI.
+    base=ROOT/'overlay/apps/web/src/app/mastery'
+    ui=(base/'workspace-ui.tsx').read_text()
+    legacy=(ROOT/'docs/archive/mastery-v09-debate-page.tsx.txt').read_text()
+    redirect=(base/'legacy/page.tsx').read_text()
+    assert all(item in ui for item in ('offline-help','expand','ProblemGraph',
+        'offline-diagnosis','starter-questions','Check answer','Question Bank'))
+    assert all(item in legacy for item in ('question.reason','Offline ready','Start practice'))
+    assert 'mastery/legacy' not in ui
+    assert 'redirect("/mastery")' in redirect
 
 
 def test_extended_independent_answer_audit():

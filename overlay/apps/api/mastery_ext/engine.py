@@ -14,6 +14,7 @@ import sqlite3
 import threading
 import json
 import uuid
+from mastery_ext import analytics, workspace, science_policy
 
 _LOCK = threading.RLock()
 P_INIT, P_GUESS, P_SLIP, P_LEARN = 0.20, 0.20, 0.10, 0.12
@@ -69,6 +70,25 @@ def connect():
         claim TEXT NOT NULL, premises TEXT NOT NULL, created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS prop_course ON propositions(user_id,course_id);
+    CREATE TABLE IF NOT EXISTS debate_workspaces (
+        user_id TEXT NOT NULL, course_id TEXT NOT NULL, resolution TEXT NOT NULL,
+        debate_date TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL,
+        PRIMARY KEY(user_id,course_id)
+    );
+    CREATE TABLE IF NOT EXISTS debate_cards (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL, course_id TEXT NOT NULL,
+        side TEXT NOT NULL, claim TEXT NOT NULL, warrant TEXT NOT NULL DEFAULT '',
+        impact TEXT NOT NULL DEFAULT '', evidence TEXT NOT NULL DEFAULT '',
+        source TEXT NOT NULL DEFAULT '', counter TEXT NOT NULL DEFAULT '',
+        response TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS debate_card_course ON debate_cards(user_id,course_id,side);
+    CREATE TABLE IF NOT EXISTS debate_drills (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL, course_id TEXT NOT NULL,
+        card_id TEXT, prompt TEXT NOT NULL, response TEXT NOT NULL,
+        elapsed_seconds INTEGER NOT NULL, created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS debate_drill_course ON debate_drills(user_id,course_id,created_at);
     CREATE TABLE IF NOT EXISTS diagnostic_probes (
         user_id TEXT NOT NULL, course_id TEXT NOT NULL, problem_id TEXT NOT NULL,
         result_id TEXT NOT NULL, probe_id TEXT NOT NULL, skill TEXT NOT NULL,
@@ -91,6 +111,28 @@ def connect():
         conn.execute('ALTER TABLE context ADD COLUMN difficulty_level INTEGER')
     if 'root_level' not in {r['name'] for r in conn.execute('PRAGMA table_info(learning_queue)')}:
         conn.execute('ALTER TABLE learning_queue ADD COLUMN root_level INTEGER')
+    conn.executescript('''
+    CREATE TABLE IF NOT EXISTS hint_exposures (
+      user_id TEXT NOT NULL, course_id TEXT NOT NULL, problem_id TEXT NOT NULL,
+      shown_at TEXT NOT NULL,
+      PRIMARY KEY(user_id,course_id,problem_id)
+    );
+    CREATE INDEX IF NOT EXISTS ix_hint_exposure_owner ON hint_exposures(user_id,course_id);
+    ''')
+    conn.executescript('''
+    CREATE TABLE IF NOT EXISTS review_progress (
+      user_id TEXT NOT NULL, course_id TEXT NOT NULL, skill TEXT NOT NULL,
+      review_successes INTEGER NOT NULL DEFAULT 0,
+      retention_lapses INTEGER NOT NULL DEFAULT 0,
+      last_independent_at TEXT,
+      PRIMARY KEY (user_id,course_id,skill)
+    );
+    ''')
+    analytics.install(conn)
+    workspace.install(conn)
+    analytics.migrate_legacy(conn)
+    if 'assisted' not in {r['name'] for r in conn.execute('PRAGMA table_info(context)')}:
+        conn.execute('ALTER TABLE context ADD COLUMN assisted INTEGER NOT NULL DEFAULT 0')
     return conn
 
 
@@ -105,7 +147,7 @@ def update_bkt(prior: float, correct: bool) -> float:
 
 
 def prepare_context(user_id: str, problem_id: str, confidence: int | None, reasoning: str,
-                    mode: str = 'challenge', difficulty_level: int | None = None):
+                    mode: str = 'challenge', difficulty_level: int | None = None, assisted: bool = False):
     if confidence is not None and not 1 <= confidence <= 5:
         raise ValueError('Confidence must be 1–5')
     if len(reasoning) > 2500:
@@ -115,12 +157,20 @@ def prepare_context(user_id: str, problem_id: str, confidence: int | None, reaso
     if difficulty_level is not None and difficulty_level not in (1,2,3):
         raise ValueError('Difficulty must be 1, 2, or 3')
     with _LOCK, connect() as conn:
-        conn.execute('''INSERT INTO context(user_id,problem_id,confidence,reasoning,prepared_at,mode,difficulty_level)
-          VALUES (?,?,?,?,?,?,?)
+        conn.execute('''INSERT INTO context(user_id,problem_id,confidence,reasoning,prepared_at,mode,difficulty_level,assisted)
+          VALUES (?,?,?,?,?,?,?,?)
           ON CONFLICT(user_id,problem_id) DO UPDATE SET
           confidence=excluded.confidence, reasoning=excluded.reasoning,
-          prepared_at=excluded.prepared_at, mode=excluded.mode, difficulty_level=excluded.difficulty_level''',
-          (str(user_id), str(problem_id), confidence, reasoning, utcnow().isoformat(), mode, difficulty_level))
+          prepared_at=excluded.prepared_at, mode=excluded.mode, difficulty_level=excluded.difficulty_level, assisted=excluded.assisted''',
+          (str(user_id), str(problem_id), confidence, reasoning, utcnow().isoformat(), mode, difficulty_level, int(assisted)))
+
+
+def mark_hint_exposure(user_id: str, course_id: str, problem_id: str) -> None:
+    # Server-owned sticky provenance, independent of client help flags.
+    with _LOCK, connect() as conn:
+        conn.execute('''INSERT OR IGNORE INTO hint_exposures
+            (user_id,course_id,problem_id,shown_at) VALUES (?,?,?,?)''',
+            (str(user_id),str(course_id),str(problem_id),utcnow().isoformat()))
 
 
 def record_attempt(*, result_id: str, user_id: str, course_id: str,
@@ -133,16 +183,27 @@ def record_attempt(*, result_id: str, user_id: str, course_id: str,
     with _LOCK, connect() as conn:
         if conn.execute('SELECT 1 FROM attempts WHERE result_id=? LIMIT 1', (str(result_id),)).fetchone():
             return False
-        ctx = conn.execute('SELECT confidence,reasoning,prepared_at,mode,difficulty_level FROM context WHERE user_id=? AND problem_id=?',
+        ctx = conn.execute('SELECT confidence,reasoning,prepared_at,mode,difficulty_level,assisted FROM context WHERE user_id=? AND problem_id=?',
                            (str(user_id),str(problem_id))).fetchone()
         # Ignore stale pre-answer context older than an hour.
         if ctx and (utcnow() - parse_utc(ctx['prepared_at'])).total_seconds() > 3600:
             ctx = None
         conf = ctx['confidence'] if ctx else None
         reasoning = ctx['reasoning'] if ctx else ''
+        exposure=conn.execute('''SELECT 1 FROM hint_exposures
+            WHERE user_id=? AND course_id=? AND problem_id=?''',
+            (str(user_id),str(course_id),str(problem_id))).fetchone()
+        assisted = bool(ctx['assisted']) if ctx else False
+        assisted = bool(assisted or exposure)
         mode = ctx['mode'] if ctx and ctx['mode'] in ('challenge','repair','review','transfer') else 'challenge'
         level = ctx['difficulty_level'] if ctx else None
         now = utcnow()
+        analytics.add_event(conn, result_id=result_id, user_id=user_id, course_id=course_id,
+            problem_id=problem_id, skills=skills, correct=correct,
+            assisted=assisted, mode=mode,
+            difficulty_level=level, elapsed_ms=elapsed_ms, confidence=conf,
+            error_category=error_category, reasoning=reasoning,
+            recorded_at=now.isoformat())
         for i, skill in enumerate(skills):
             event_id = str(result_id) if i == 0 else f'{result_id}:{i}'
             conn.execute('''INSERT INTO attempts VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
@@ -157,32 +218,65 @@ def record_attempt(*, result_id: str, user_id: str, course_id: str,
             root_level = queue['root_level'] if queue else None
             # Treat a transfer as confirmed only when it meets the missed
             # question's difficulty and follows an actual repair step.
-            verified_transfer = (mode == 'transfer' and prior_phase == 'transfer'
+            verified_transfer = (not assisted and mode == 'transfer' and prior_phase == 'transfer'
                 and root_level is not None and level is not None and level >= root_level)
             valid_foundation = (mode == 'repair' and prior_phase == 'repair'
                 and root_level is not None and level is not None and level < root_level)
+            state = conn.execute('''SELECT review_successes,retention_lapses,last_independent_at
+                FROM review_progress WHERE user_id=? AND course_id=? AND skill=?''',
+                (str(user_id),str(course_id),skill)).fetchone()
+            # The grade event has been inserted already. Ignore its own ID when
+            # checking whether the question is fresh in this user/course.
+            fresh = not conn.execute('''SELECT 1 FROM attempt_events WHERE user_id=?
+                AND course_id=? AND problem_id=? AND result_id != ? LIMIT 1''',
+                (str(user_id),str(course_id),str(problem_id),str(result_id))).fetchone()
             prior = float(previous['p']) if previous else P_INIT
             # A solved foundation question after a miss is weak evidence of
             # mastery of the *hard* target. Credit it conservatively.
             p = min(1.0, prior + .03) if mode == 'repair' and correct else update_bkt(prior, correct)
             n = int(previous['n'])+1 if previous else 1
             streak = (int(previous['streak']) if previous else 0) + (1 if mode != 'repair' else 0) if correct else 0
-            # Graduated review intervals are a transparent heuristic, not calibrated FSRS.
-            days = [0,1,3,7,14,30,60][min(streak,6)] if correct else 0
-            due_at = now + (timedelta(days=days) if correct else timedelta(minutes=15))
-            if mode == 'repair' and correct and previous:
-                due_at = parse_utc(previous['due_at'])  # foundation pass cannot erase review debt
+            # An assisted correct answer is practice, not fresh independent mastery.
+            if assisted and correct:
+                p = prior
+                streak = int(previous['streak']) if previous else 0
+            # Durable spacing: only a fresh, independent, overdue retrieval
+            # advances intervals. Repeated same-day correct responses do not.
+            prior_due = previous['due_at'] if previous else None
+            previous_independent_at = state['last_independent_at'] if state else None
+            review_successes = int(state['review_successes']) if state else 0
+            due_iso, review_successes, delayed_review = science_policy.next_review(
+                now=now, prior_due=prior_due,
+                previous_independent_at=previous_independent_at,
+                review_successes=review_successes, correct=correct,
+                assisted=assisted, mode=mode, fresh=fresh)
+            # Foundation work and unverified transfer cannot clear due debt.
+            due_at = parse_utc(due_iso)
+            # A verified transfer ends the immediate correction loop but is
+            # not proof of long-term retention. A 30m check remains due.
             if verified_transfer and correct:
-                due_at = now + timedelta(minutes=30)  # independent retention evidence still due
-            elif mode == 'transfer' and correct and previous:
-                due_at = parse_utc(previous['due_at'])  # unverified transfer cannot discharge review
+                due_at = now + timedelta(minutes=30)
+            lapses = (int(state['retention_lapses']) if state else 0) + int(
+                not correct and mode == 'review' and previous_independent_at is not None
+                and science_policy.is_delayed(previous_independent_at, now))
+            last_independent_at = (now.isoformat() if not assisted and fresh
+                                   else previous_independent_at)
+            conn.execute('''INSERT INTO review_progress
+                (user_id,course_id,skill,review_successes,retention_lapses,last_independent_at)
+                VALUES (?,?,?,?,?,?) ON CONFLICT(user_id,course_id,skill) DO UPDATE SET
+                review_successes=excluded.review_successes,
+                retention_lapses=excluded.retention_lapses,
+                last_independent_at=excluded.last_independent_at''',
+                (str(user_id),str(course_id),skill,review_successes,lapses,last_independent_at))
             conn.execute('''INSERT INTO mastery(user_id,course_id,skill,p,n,due_at,last_at,streak)
               VALUES (?,?,?,?,?,?,?,?)
               ON CONFLICT(user_id,course_id,skill) DO UPDATE SET
               p=excluded.p,n=excluded.n,due_at=excluded.due_at,last_at=excluded.last_at,
               streak=excluded.streak''',
               (str(user_id),str(course_id),skill,p,n,due_at.isoformat(),now.isoformat(),streak))
-            if not correct:
+            if assisted and correct:
+                phase = prior_phase  # Guided answers cannot clear the repair queue.
+            elif not correct:
                 phase = 'repair'
                 # A new failure redefines the target if it was a challenge.
                 if prior_phase == 'challenge' or root_level is None:
@@ -203,6 +297,7 @@ def record_attempt(*, result_id: str, user_id: str, course_id: str,
                 phase=excluded.phase,updated_at=excluded.updated_at,
                 last_problem_id=excluded.last_problem_id,root_level=excluded.root_level''',
                 (str(user_id),str(course_id),skill,phase,now.isoformat(),str(problem_id),root_level))
+        workspace.clear_draft(conn,str(user_id),str(course_id),str(problem_id))
         conn.execute('DELETE FROM context WHERE user_id=? AND problem_id=?',(str(user_id),str(problem_id)))
     return True
 
@@ -227,7 +322,7 @@ def summary(user_id: str, course_id: str):
             'high_confidence_mistakes':sum(1 for r in errors if not r['correct'] and (r['confidence'] or 0) >= 4 and ':' not in r['result_id']),
             'edges':[dict(e) for e in edges], 'model':'BKT (uncalibrated)',
             'learning_phases':[dict(r) for r in phases if r['phase'] != 'challenge'],
-            'review_policy':'Graduated heuristic intervals (1, 3, 7, 14, 30, 60 days); not calibrated FSRS'}
+            'review_policy':'Overdue independent retrieval advances heuristic intervals (1, 3, 7, 14, 30, 60 days); not calibrated FSRS'}
 
 
 def choose_next(user_id: str, course_id: str, problems: list[dict],
@@ -326,6 +421,31 @@ def choose_next(user_id: str, course_id: str, problems: list[dict],
                       - .65 * repeats, 5),
                 -repeats, '' if not last else '-'+last, str(p['id']))
 
+    # Interleave only established skills, and never override a focused skill,
+    # a due review, or the prerequisite-repair / transfer progression.
+    interleaved = False
+    if mode == 'challenge' and not focus_skill and not reviewing:
+        with connect() as conn:
+            events = conn.execute('''SELECT skills_json,correct FROM attempt_events
+                WHERE user_id=? AND course_id=? AND assisted=0
+                AND mode='challenge' ORDER BY recorded_at DESC,rowid DESC LIMIT 120''',
+                (str(user_id),str(course_id))).fetchall()
+        skill_history = {}
+        recent_skill = None
+        for e in events:
+            tags = json.loads(e['skills_json'])
+            if not tags: continue
+            if recent_skill is None: recent_skill = tags[0]
+            for sk in tags:
+                skill_history.setdefault(sk,[]).append(bool(e['correct']))
+        established = {sk for sk,results in skill_history.items()
+                       if len(results) >= 3 and sum(results[:3]) >= 2}
+        mixing = [p for p in pool if (any(sk in established for sk in skills_for(p))
+                     and recent_skill not in skills_for(p))]
+        available_skills = {sk for p in pool for sk in skills_for(p) if sk in established}
+        if len(available_skills) >= 2 and mixing:
+            pool = mixing
+            interleaved = True
     chosen = max(pool, key=rating)
     meta = chosen.get('problem_metadata') or {}
     reason = ('Due retention check on a different item' if reviewing else
@@ -348,7 +468,17 @@ def choose_next(user_id: str, course_id: str, problems: list[dict],
                 reason = 'Repair practice: no simpler question available in this skill'
             elif mode == 'transfer' and now_level <= earlier:
                 reason = 'Transfer practice: no harder question available in this skill'
+    with connect() as conn:
+        event_rows=conn.execute('''SELECT skills_json,correct FROM attempt_events
+            WHERE user_id=? AND course_id=? AND assisted=0 AND mode IN ('challenge','review','transfer')
+            ORDER BY recorded_at DESC,rowid DESC LIMIT 80''',(str(user_id),str(course_id))).fetchall()
+    skill_name=skills_for(chosen)[0]
+    performance=[bool(r['correct']) for r in reversed(event_rows)
+                 if skill_name in json.loads(r['skills_json'])]
+    guidance=science_policy.instruction(performance)
+    guidance['interleaved']=interleaved
     return {'id': str(chosen['id']), 'question': chosen['question'],
+            'learning_guidance': guidance,
             'question_type': chosen.get('question_type', 'mc'),
             'options': chosen.get('options'), 'difficulty_layer': chosen.get('difficulty_layer'),
             'skills': skills_for(chosen), 'hint': meta.get('hint'),
@@ -419,6 +549,89 @@ def list_propositions(user_id:str,course_id:str):
     return [{**dict(r),'premises':json.loads(r['premises'])} for r in rows]
 
 
+def save_debate_workspace(user_id:str,course_id:str,resolution:str,debate_date:str='') -> dict:
+    resolution=resolution.strip()
+    debate_date=debate_date.strip()
+    if not 8 <= len(resolution) <= 1000:raise ValueError('Resolution must be 8–1000 characters')
+    if len(debate_date)>40:raise ValueError('Debate date is too long')
+    updated_at=utcnow().isoformat()
+    with _LOCK,connect() as c:
+        c.execute('''INSERT INTO debate_workspaces(user_id,course_id,resolution,debate_date,updated_at)
+          VALUES (?,?,?,?,?) ON CONFLICT(user_id,course_id) DO UPDATE SET
+          resolution=excluded.resolution,debate_date=excluded.debate_date,updated_at=excluded.updated_at''',
+          (str(user_id),str(course_id),resolution,debate_date,updated_at))
+    return {'resolution':resolution,'debate_date':debate_date,'updated_at':updated_at}
+
+
+def add_debate_card(user_id:str,course_id:str,side:str,claim:str,warrant:str='',impact:str='',
+                    evidence:str='',source:str='',counter:str='',response:str='') -> dict:
+    side=side.upper().strip()
+    if side not in ('PRO','CON'):raise ValueError('Side must be PRO or CON')
+    values={'claim':claim,'warrant':warrant,'impact':impact,'evidence':evidence,'source':source,
+            'counter':counter,'response':response}
+    limits={'claim':500,'warrant':1200,'impact':600,'evidence':1200,'source':500,'counter':900,'response':900}
+    clean={name:str(value).strip() for name,value in values.items()}
+    if not 4 <= len(clean['claim']) <= limits['claim']:raise ValueError('Claim must be 4–500 characters')
+    if any(len(clean[name])>limit for name,limit in limits.items()):raise ValueError('Debate card field is too long')
+    item={'id':str(uuid.uuid4()),'side':side,**clean,'created_at':utcnow().isoformat()}
+    with _LOCK,connect() as c:
+        c.execute('''INSERT INTO debate_cards
+          (id,user_id,course_id,side,claim,warrant,impact,evidence,source,counter,response,created_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
+          (item['id'],str(user_id),str(course_id),side,clean['claim'],clean['warrant'],clean['impact'],
+           clean['evidence'],clean['source'],clean['counter'],clean['response'],item['created_at']))
+    return item
+
+
+def add_debate_drill(user_id:str,course_id:str,prompt:str,response:str,elapsed_seconds:int,
+                     card_id:str|None=None) -> dict:
+    prompt,response=str(prompt).strip(),str(response).strip()
+    if not 4 <= len(prompt) <= 1200 or not 1 <= len(response) <= 3000:raise ValueError('Invalid drill prompt or response')
+    if not 1 <= int(elapsed_seconds) <= 1800:raise ValueError('Elapsed time must be 1–1800 seconds')
+    item={'id':str(uuid.uuid4()),'card_id':str(card_id) if card_id else None,'prompt':prompt,
+          'response':response,'elapsed_seconds':int(elapsed_seconds),'created_at':utcnow().isoformat()}
+    with _LOCK,connect() as c:
+        if card_id:
+            owned=c.execute('SELECT 1 FROM debate_cards WHERE id=? AND user_id=? AND course_id=?',
+                            (str(card_id),str(user_id),str(course_id))).fetchone()
+            if not owned:raise ValueError('Debate card not found')
+        c.execute('INSERT INTO debate_drills VALUES (?,?,?,?,?,?,?,?)',
+                  (item['id'],str(user_id),str(course_id),item['card_id'],prompt,response,
+                   item['elapsed_seconds'],item['created_at']))
+    return item
+
+
+def debate_workspace(user_id:str,course_id:str) -> dict:
+    with connect() as c:
+        workspace=c.execute('''SELECT resolution,debate_date,updated_at FROM debate_workspaces
+            WHERE user_id=? AND course_id=?''',(str(user_id),str(course_id))).fetchone()
+        cards=c.execute('''SELECT id,side,claim,warrant,impact,evidence,source,counter,response,created_at
+            FROM debate_cards WHERE user_id=? AND course_id=? ORDER BY side DESC,created_at''',
+            (str(user_id),str(course_id))).fetchall()
+        drills=c.execute('''SELECT id,card_id,prompt,response,elapsed_seconds,created_at FROM debate_drills
+            WHERE user_id=? AND course_id=? ORDER BY created_at DESC LIMIT 30''',
+            (str(user_id),str(course_id))).fetchall()
+    return {'workspace':dict(workspace) if workspace else {'resolution':'','debate_date':'','updated_at':''},
+            'cards':[dict(r) for r in cards],'drills':[dict(r) for r in drills]}
+
+
+def debate_fact_sheet(user_id:str,course_id:str) -> str:
+    data=debate_workspace(user_id,course_id)
+    title=data['workspace']['resolution'] or 'Untitled debate resolution'
+    date=data['workspace']['debate_date']
+    lines=[title]+([f'Debate date: {date}'] if date else [])
+    for side in ('PRO','CON'):
+        lines.extend(['',side])
+        side_cards=[card for card in data['cards'] if card['side']==side]
+        if not side_cards:lines.append('- No argument cards yet.')
+        for index,card in enumerate(side_cards,1):
+            lines.append(f'{index}. {card["claim"]}')
+            for label,key in (('Why','warrant'),('Impact','impact'),('Evidence','evidence'),
+                              ('Source','source'),('They may say','counter'),('Answer','response')):
+                if card[key]:lines.append(f'   {label}: {card[key]}')
+    return '\n'.join(lines)
+
+
 def store_probe_result(user_id: str, course_id: str, problem_id: str, result_id: str,
                        probe_id: str, skill: str, answer: str, correct: bool) -> bool:
     # One diagnostic answer per original wrong result, separate from mastery.
@@ -445,7 +658,8 @@ def forget_course(user_id: str, course_id: str, problem_ids: list[str] | None = 
     Context is keyed by user+problem (from legacy v0.3); use the owning
     OpenTutor course's IDs to remove only those records, not other courses.
     """
-    names = ('attempts','mastery','edges','propositions','diagnostic_probes','learning_queue')
+    names = ('hint_exposures','attempts','attempt_events','saved_questions','answer_drafts','mastery','edges','propositions','diagnostic_probes','learning_queue',
+             'debate_workspaces','debate_cards','debate_drills','review_progress')
     removed: dict[str,int] = {}
     with _LOCK,connect() as conn:
         for name in names:

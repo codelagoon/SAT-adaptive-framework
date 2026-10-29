@@ -42,7 +42,7 @@ class StrictPreflight(unittest.TestCase):
 
     def test_real_ui_diagnosis_and_data_deletion_checked(self):
         text = SMOKE.read_text() + (ROOT/'scripts/verify_bundled_runtime.py').read_text()
-        for needle in ("/mastery'", "Learn where it gets difficult",
+        for needle in ("/mastery'", "Loading your study workspace",
                        "/offline-diagnosis/", "diagnostic_probes",
                        "SELECT * FROM", "hdiutil attach", "codesign --verify"):
             self.assertIn(needle, text)
