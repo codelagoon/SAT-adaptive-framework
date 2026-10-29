@@ -25,25 +25,35 @@ workflows:
           uv --version
           node --version
           xcrun swiftc --version
-      - name: Verify source integrity and run 84+ regression tests
+      - name: Install browser verification tools
+        script: |
+          set -euo pipefail
+          uv python install 3.11
+          uv run --no-project --python 3.11 --with pytest --with playwright python -m playwright install chromium
+          npm install --prefix "${PWD}/build/tenet-browser" --no-audit --no-fund playwright
+      - name: Verify source integrity and run regression tests
         script: |
           set -euo pipefail
           test -f scripts/apply_overlay.py
           test -f scripts/build_portable_macos.sh
           test -f overlay/apps/api/mastery_ext/router.py
           test -f overlay/apps/web/src/app/mastery/page.tsx
-          uv python install 3.11
-          uv run --no-project --python 3.11 --with pytest python -m pytest tests/ -q
-          bash -n scripts/*.sh
+          uv run --no-project --python 3.11 --with pytest --with playwright python -m pytest tests/ -q
+          for script in scripts/*.sh; do bash -n "$script" || exit; done
       - name: Build complete self-contained Apple Silicon application
         script: |
           set -euo pipefail
-          bash scripts/build_portable_macos.sh
+          TENET_LINT=1 bash scripts/build_portable_macos.sh
           test -s dist/MasteryEngine2-AppleSilicon-Standalone.dmg
       - name: Prove bundled app can create, grade, and erase a temporary course
         script: |
           set -euo pipefail
+          export TENET_UI_E2E=1
+          export PLAYWRIGHT_MODULE="${PWD}/build/tenet-browser/node_modules/playwright"
+          export CHROMIUM_EXECUTABLE="$(uv run --no-project --python 3.11 --with pytest --with playwright python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
           bash scripts/codemagic_smoke.sh
+          cat build/tenet-eslint.log
+          test "$(cat build/tenet-eslint.status)" = 0
       - name: Publish DMG only after a successful live smoke test
         script: |
           set -euo pipefail
@@ -54,3 +64,6 @@ workflows:
     artifacts:
       - release/*.dmg
       - release/SHA256SUMS.txt
+      - build/ui-evidence/**
+      - build/preview-screenshots/**
+      - build/tenet-eslint.*
