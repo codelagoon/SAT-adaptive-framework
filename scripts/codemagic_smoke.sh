@@ -1,6 +1,8 @@
 #!/bin/bash
 # Shared Apple Silicon release gate, used by GitHub Actions and Codemagic.
 set -euo pipefail
+# Verification imports use the bundled Python too; never alter its sealed files.
+export PYTHONDONTWRITEBYTECODE=1
 SOURCE="$(cd "$(dirname "$0")/.." && pwd)"
 DMG="$SOURCE/dist/MasteryEngine2-AppleSilicon-Standalone.dmg"
 [[ "$(uname -s)" == Darwin && "$(uname -m)" == arm64 && -s "$DMG" ]] || {
@@ -97,5 +99,8 @@ if [[ "${TENET_UI_E2E:-0}" == 1 ]]; then
   "$RES/node" "$SOURCE/scripts/verify_tenet_ui.cjs"
 fi
 stop_services
+# First launch must preserve the seal, including Python and Next runtime caches.
+/usr/bin/codesign --verify --deep --strict "$APP"
+echo 'PASS: application signature remains valid after real browser and restart journeys'
 echo 'PASS: installed bundled runtime, restart recovery and course deletion isolation'
 echo 'NOT VERIFIED: physical network disconnection, Cocoa/WebKit interaction, Gatekeeper, notarization or updates'

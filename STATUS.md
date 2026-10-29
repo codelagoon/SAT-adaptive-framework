@@ -7,7 +7,7 @@
 - Protected foundation: `6cb852c588c13c707b9bcc1e2971aa07d118ee25`; remote rechecked unchanged.
 - Application code tested: `eabf06fcd849550b17dc3e10c292cf45009edd47`. Configuration follow-up: `94f2b16d3d311239718806c8146706308e78aba2` (Codemagic only; same application code).
 - Governing inputs: attached complete handoff dated 2026-10-29 and GitHub issue #2. Inner ZIP SHA-256 `b587011df54dea8b3e9d53c44518fee7131b9b42d98a5d0712f6f379caabcf31`; CRC verified.
-- Local isolated worktree: `/Users/george/Documents/Codex/2026-10-28/x20/work/tenet-integrated`, currently at eabf06f. Local disk exhaustion prevents writes/fetch/checkpoint; configuration and this ledger were saved directly to the isolated GitHub branch. After freeing storage, inspect local changes and fast-forward to the remote branch. No force push, merge, public release or paid Codemagic run.
+- Local isolated worktree: `/Users/george/Documents/Codex/2026-10-28/x20/work/tenet-integrated`. Storage recovered to 5.1 GiB after the disk-full incident; branch fast-forwarded to remote checkpoint 572aed5. Configuration and interim ledger had been saved directly to GitHub while local writes were blocked. No force push, merge, public release or paid Codemagic run.
 - Preserve existing installed app and ordinary learner databases. All runtime tests used disposable identities/data.
 
 ## Implemented and exercised
@@ -28,19 +28,19 @@ Independent whole-branch review found seven Important and two Minor defects. One
 | Native arm64 build / bundled DMG | Same CI: Swift arm64 compile, self-contained Python/Node/Next DMG; mounted, relocated into path containing spaces; ad-hoc signature verified | PASS build and service smoke; candidate artifact only |
 | Runtime stop/restart / deletion | Real bundled HTTP grade, diagnosis/repair; exact attempts/review dates/queue preserved across full service restart; deleting SAT preserves Physics; no listeners after shutdown | PASS service path; Cocoa quit/reopen not proven |
 | OS-enforced offline | Local sandbox denies external socket with EPERM; real isolated API grades/repairs/restarts under same policy | PASS backend only; full native WebKit offline gate NOT RUN |
-| Actual Cocoa/WebKit | No captured native window. LaunchServices returned -10810 during exhausted storage; Accessibility preflight false, screen capture true | BLOCKED by host/storage/automation access; complete native course→hint/unaided answer→diagnosis→analytics→quit/reopen still required |
+| Actual Cocoa/WebKit | No captured native window. LaunchServices returned -10810 during exhausted storage; Accessibility preflight false, screen capture true | Storage recovered; real candidate download/native retest IN PROGRESS. Accessibility remains false. Complete native course→hint/unaided answer→diagnosis→analytics→quit/reopen still required |
 | Clean account / physical M1 / Gatekeeper | CI mounted/relocated candidate only | NOT RUN; must install and open actual candidate in a clean test account |
 | Signing / notarization / updater | `security find-identity -v -p codesigning`: 0 valid identities. Sparkle 2 evaluation retained from foundation ledger history | BLOCKED on Developer ID/notarization credentials and implemented/tested signed feed, update, migration/rollback recovery |
 | Manual Codemagic compatibility | 94f2b16 adds Python/Node Playwright, real UI smoke, full lint gate and evidence artifacts; manual M2 workflow preserved. YAML parsed and all six script blocks passed bash syntax. Existing config checks 2 passed using no disk capture/cache | Configuration checked; Codemagic runner NOT EXECUTED (no paid run) |
 
-Fresh full Apple Silicon recheck [40905363795](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40905363795) at 94f2b16 is IN PROGRESS. Do not treat an unfinished run as passing.
+Fresh full Apple Silicon recheck [40905363795](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40905363795) at 94f2b16: **SUCCESS**, 196 passed, 2 skipped in 43.00s; full Next/TypeScript build, full eslint (0 errors, 1 warning), mounted/relocated DMG service/restart/deletion smoke, and all real browser journeys passed again. Lint warning: Solve load effect omits query dependency; keyed parent remount currently covers query changes and Back journey passes. Deferred minor: make dependency explicit in a future verified UI slice. CI also warns about old Node action versions and unconfigured uv cache invalidation.
 
 ## Candidate and evidence
-- [Installable candidate DMG artifact](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40902264623/artifacts/12909878231), archive 349,617,909 bytes, 14-day CI retention. Ad-hoc signed; not approved for release.
-- [Browser evidence](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40902264623/artifacts/12909608786), result.json reports pass, 3 viewports, 18 screenshots, consoleErrors=[].
-- [Production web verification assets](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40902264623/artifacts/12910007969).
+- [Installable candidate DMG artifact](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40905363795/artifacts/12911238476), archive 348,219,001 bytes, 14-day CI retention. Ad-hoc signed; not approved for release.
+- [Browser evidence](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40905363795/artifacts/12910829474), result.json reports pass, 3 viewports, 18 screenshots, consoleErrors=[].
+- [Production web verification assets](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40905363795/artifacts/12911707213).
 - Local scratch evidence under parent work/: tenet-ci-5.log/browser; tenet-migration.log; tenet-content-audit.json (audit stdout, not JSON); tenet-review-red.log/all.log; tenet-api-smoke/.
-- Local deliverable export into outputs is BLOCKED: a ten-byte write fails with OSError errno 28. Do not mistake existing Oct 28 outputs/STATUS.md for this current checkpoint.
+- Actual browser evidence (37 files), latest CI log and integration patch exported under `/Users/george/Documents/Codex/2026-10-28/x20/outputs/`. The existing Oct 28 outputs/STATUS.md is historical; use TENET_STATUS.md for this checkpoint.
 
 ## Unresolved product gaps — must not be described as completed
 1. Tests route currently launches unseen independent practice; **no full timed SAT/ACT exam engine**, pacing/break/resume or withheld-feedback timed block. No official score prediction or calibration.
@@ -70,7 +70,18 @@ Fresh full Apple Silicon recheck [40905363795](https://github.com/codelagoon/SAT
 - Preserve verified application milestone rather than start a large new feature while storage prevents builds/tests; full handoff remains incomplete.
 
 ## Next single action
-Free at least 5 GB on the Mac and enable Accessibility for the app controlling native verification. Then fast-forward this isolated worktree from origin (it currently remains eabf06f), retrieve the candidate DMG, and verify actual installed Cocoa/WebKit journey with a disposable data folder under OS-level external-network blocking. Confirm quit/reopen persistence and installed-data migration before any release decision. Continue outstanding product slices only with their own complete build/test gates.
+Storage recovered and worktree synchronized. Finish downloading the tested candidate DMG and verify an actual Cocoa/WebKit window in an isolated test installation/data folder under OS-level external-network blocking. Accessibility is still false; native input acceptance needs working automation access or direct manual execution. Confirm quit/reopen persistence and installed-data migration before any release decision. Continue outstanding product slices only with their own complete build/test gates.
 
 Candidate retrieval after storage is available:
-`gh run download 40902264623 --repo codelagoon/SAT-adaptive-framework -n MasteryEngine2-Standalone-M1-DMG -D ../tenet-native-installer`
+`gh run download 40905363795 --repo codelagoon/SAT-adaptive-framework -n MasteryEngine2-Standalone-M1-DMG -D ../tenet-native-installer`
+
+## Native M1 continuation and newly reproduced release defect
+- Storage recovered to 5.1 GiB; local worktree fast-forwarded from the remote checkpoint. Local non-browser suite rechecked **187 passed, 2 skipped** (4.85s).
+- Fresh CI **40905363795** at **94f2b16** passed **196 tests, 2 skipped**, full production Next/TypeScript, lint (0 errors, 1 warning), all real browser journeys and mounted/relocated DMG service/restart/deletion checks. Candidate SHA-256 downloaded locally: `97eb52361abcc4256bd2d7227a854cf34966e7d2225440bf810dfc3a75083dbd`.
+- Actual host reports **Apple M1**. Original mounted candidate signature verifies; Gatekeeper assessment **rejected**, ad-hoc signature, TeamIdentifier not set. The synced Documents folder added FinderInfo to the test copy; moved only that copy to a task-owned `/private/tmp/tenet-native-94f2-572aed5/Installed Apps/` folder and removed that attribute. Test bundle ID changed/re-signed solely to isolate the ordinary WebKit profile; native binary/application code otherwise from CI.
+- Actual Cocoa/WebKit window **4985**, PID **29511**, title Tenet, rendered real SAT Reading & Writing Bank under the OS profile denying external network and allowing loopback. Screenshot: `outputs/Tenet-Native-Evidence/native-webkit.png`. Health matched disposable data file and nonempty instance ID. Three courses, 562 questions and a server-logged help event were present after observed native use. This is real window/manual activity evidence; automated native input remains unavailable (Accessibility false).
+- **NEW RELEASE FAILURE:** test copy's signature verified before native launch, then failed afterward. Detailed codesign evidence identifies **1,674 added files**: Python bytecode and Next `.next/server/route-cache` files. This was not caught by the previous before-launch-only CI signature gate. The previous DMGs must NOT be treated as release-ready.
+- Fix underway: portable launcher disables Python bytecode; overlay sets Next `experimental.isrFlushToDisk: false` (confirmed in bundled Next 16.4.3 schema and filesystem-cache implementation); shared smoke exports no-bytecode for verification tools and requires signature verification AFTER full browser/restart journeys.
+- New real-import regression observed **RED** (bundled module creates `.pyc`) then **GREEN**. Local suite during running native services: **186 passed, 4 skipped**; two additional skips are occupied-port fixtures. Shell syntax/diff checks pass. Patched verification copy's observed unsealed cache additions removed, runtime/config updated and re-signed; fresh native/rebuild verification pending.
+- Cocoa graceful terminate returned **true**; native PID and service listeners exited. Disposable stores preserved. Before reopening, immutable read-only snapshot saved row counts/SHA-256 per table; original ordinary learner DBs not used.
+- Next single action: verify patched native restart/table preservation and post-use signature, then require fresh complete Apple Silicon CI with the new after-use seal gate.

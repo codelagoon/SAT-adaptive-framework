@@ -8,6 +8,7 @@ import time
 import urllib.request
 import tempfile
 import unittest
+import shlex
 
 BASE = Path(__file__).resolve().parents[1]
 LAUNCH = BASE / 'scripts/mastery_portable_launch.sh'
@@ -24,6 +25,39 @@ def ports_free():
 
 
 class PortablePackagingTest(unittest.TestCase):
+    def test_startup_import_does_not_write_bytecode_inside_bundle(self):
+        # Run the real launcher up to its first Python invocation. The probe
+        # exits before binding ports; importing a real bundled module must not
+        # add files that invalidate the application's sealed resources.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            res = root / 'Application With Spaces.app/Contents/Resources'
+            api = res / 'opentutor/apps/api'
+            web = res / 'opentutor/apps/web'
+            pbin = res / 'python/bin'
+            for path in (api/'mastery_ext', web/'.next', web/'node_modules/next/dist/bin', pbin):
+                path.mkdir(parents=True, exist_ok=True)
+            (api/'main.py').write_text('')
+            (api/'bundle_probe.py').write_text('value = 42\n')
+            (web/'.next/BUILD_ID').write_text('probe')
+            (web/'node_modules/next/dist/bin/next').write_text('')
+            python = pbin/'python3.11'
+            python.write_text('#!/bin/bash\nexec ' + shlex.quote(sys.executable) +
+                              ' -c ' + shlex.quote('import bundle_probe; raise SystemExit(23)') + '\n')
+            python.chmod(0o755)
+            node = res/'node'
+            node.write_text('#!/bin/bash\nexit 0\n')
+            node.chmod(0o755)
+            before = {p.relative_to(res) for p in res.rglob('*') if p.is_file()}
+            env = dict(os.environ, MASTERY_DATA_DIR=str(root/'data'))
+            env.pop('PYTHONDONTWRITEBYTECODE', None)
+            env.pop('PYTHONPYCACHEPREFIX', None)
+            result = subprocess.run(['bash', str(LAUNCH), str(res/'opentutor'), str(res)],
+                                    env=env, capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 23, result.stderr)
+            after = {p.relative_to(res) for p in res.rglob('*') if p.is_file()}
+            self.assertEqual(after, before, 'Python startup modified signed bundle resources')
+
     def test_scripts_parse(self):
         for filename in (LAUNCH, BUILD):
             subprocess.run(['bash','-n',str(filename)],check=True)

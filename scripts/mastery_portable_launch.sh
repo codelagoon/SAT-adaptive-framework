@@ -17,7 +17,8 @@ USER_DATA="${MASTERY_DATA_DIR:-${HOME}/Library/Application Support/MasteryEngine
 mkdir -p "${USER_DATA}/uploads"
 export PATH="${RESOURCE_DIR}:${RESOURCE_DIR}/python/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export PYTHONPATH="${RESOURCE_DIR}/pylibs:${API_DIR}"
-export PYTHONUNBUFFERED=1 NEXT_TELEMETRY_DISABLED=1
+# Imports must not add .pyc files inside the signed application bundle.
+export PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 NEXT_TELEMETRY_DISABLED=1
 export NO_PROXY="127.0.0.1,localhost" no_proxy="127.0.0.1,localhost"
 export ENVIRONMENT=development DEPLOYMENT_MODE=single_user AUTH_ENABLED=false
 export APP_AUTO_CREATE_TABLES=true APP_AUTO_SEED_SYSTEM=true
