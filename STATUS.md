@@ -1,70 +1,76 @@
-# Tenet integration — 2026-10-29
+# Tenet integration — verified checkpoint, 2026-10-29
 
-Branch `codex/tenet-integrated`; protected base `6cb852c588c13c707b9bcc1e2971aa07d118ee25`.
-Spec: supplied `TENET_CODEX_HANDOFF_2026-10-29.md` and GitHub issue #2.
-Input SHA-256 verified `b587011df54dea8b3e9d53c44518fee7131b9b42d98a5d0712f6f379caabcf31`; CRC passed.
+**INCOMPLETE / NOT RELEASE-READY.** This is a verified integration milestone, not completion of the complete handoff.
 
-## Integration plan / ledger
-1. Verify input/base and reconcile complete feature tree with Mac foundation.
-2. Pass imported suite, migration/data isolation tests and curriculum audit.
-3. Full production Next build, typecheck/lint; real disposable-user browser journeys and visual QA at 1440x900, 1280x800 and 390x844.
-4. Rebuild DMG, shared service smoke, native Cocoa/WebKit launch and offline/restart verification.
-5. Independent whole-branch review, bounded fixes and release gate evidence.
+## Source and recovery
+- Repository: codelagoon/SAT-adaptive-framework. Feature branch: `codex/tenet-integrated`.
+- Protected foundation: `6cb852c588c13c707b9bcc1e2971aa07d118ee25`; remote rechecked unchanged.
+- Application code tested: `eabf06fcd849550b17dc3e10c292cf45009edd47`. Configuration follow-up: `94f2b16d3d311239718806c8146706308e78aba2` (Codemagic only; same application code).
+- Governing inputs: attached complete handoff dated 2026-10-29 and GitHub issue #2. Inner ZIP SHA-256 `b587011df54dea8b3e9d53c44518fee7131b9b42d98a5d0712f6f379caabcf31`; CRC verified.
+- Local isolated worktree: `/Users/george/Documents/Codex/2026-10-28/x20/work/tenet-integrated`, currently at eabf06f. Local disk exhaustion prevents writes/fetch/checkpoint; configuration and this ledger were saved directly to the isolated GitHub branch. After freeing storage, inspect local changes and fast-forward to the remote branch. No force push, merge, public release or paid Codemagic run.
+- Preserve existing installed app and ordinary learner databases. All runtime tests used disposable identities/data.
 
-## Decisions
-- Ruling: native worktree tool rejected this nested repository as sourceRoot; used an ordinary Git worktree at `work/tenet-integrated` instead. Protected base remains untouched; new branch starts at exact requested SHA.
-- Ruling: keep foundation scripts/workflows/Swift shell and Mac regression tests; import ZIP overlay, semantic learning tests and audits. Keep foundation patcher's course-slash rewrite (missing from old ZIP). Never apply included historical patches.
-- Ruling: use this STATUS ledger, per repository instructions; supplied science implementation plan is already implemented inside ZIP and is not an integration plan. No duplicate plan system.
-- Visual lock: supplied Neutral Ink source and neutral-ink screenshots; fixed viewport, 76px rail / 56px dock, five nav destinations, separate focus Solve, custom accessible filters. Existing product decisions authorize direct implementation, no design re-selection.
+## Implemented and exercised
+Neutral Ink Home/Learn/Bank/Solve/Tests/Analytics actual Next routes, five-icon rail/mobile dock, focus Solve, legacy redirect; deterministic curriculum/learning policy and analytics; server-logged hints, fresh/repeat/assisted provenance, bookmarks, draft persistence and course isolation. Mac installer/runtime infrastructure retained.
 
-## Implementation checkpoint
-`06b58c1` pushed; Apple Silicon run [40863435034](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40863435034) in progress.
+Independent whole-branch review found seven Important and two Minor defects. One repair pass addressed all nine: raw hint leakage; late draft resurrection; wrong-runtime native readiness; repeats falsely establishing interleaving/transfer; stale Back/query state; invented default confidence; unsubmitted hints omitted from exposure; bookmark status beyond first 120 items; overlapping attempt totals. Six backend regressions were observed failing before repair, then passing; real delayed-save race and Back navigation run in browser CI. Native ownership changes compile, but actual Cocoa behavior remains unverified.
 
-## Evidence
-- Protected base rechecked: **88 passed, 2 skipped** (`../tenet-foundation-baseline.log`); imported feature tests before implementation fail because workspace and analytics modules are missing.
-- Feature tree copied: **181 passed, 2 skipped** excluding browser preview tests. Full suite collection awaits Playwright download. Browser fixture paths updated for managed Chromium or explicit local browser.
-- Production browser harness added; CI will run real disposable-identity interactions and capture 18 screenshots/accessibility trees. Existing smoke checks retained; old SSR heading assertion adapted to the new loading shell.
-- One packaging contract failed because it only recognized a single-line workflow command; updated discovery to recognize the same smoke invocation inside a multiline command, preserving every release assertion.
-- Native automation preflight: screen recording allowed; macOS Accessibility permission **false**. Actual native interaction through accessibility is blocked until granted; no permission dialog or unrelated application was touched.
-- Local actual Apple Silicon portable build started, with an existing official standalone Node executable read-only from installed app; user installation/data unchanged. Exact production script retained.
+## Release gates
+| Gate | Actual evidence | Result / remaining requirement |
+|---|---|---|
+| Protected base / reconciliation | Base 88 passed, 2 skipped; isolated branch starts at exact protected SHA; native build retained | PASS for this integration slice |
+| Complete source suite | [CI 40902264623](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40902264623), eabf06f: 196 passed, 2 skipped; remaining skips are Linux-only runtime fixtures | PASS on clean Apple Silicon runner |
+| Full Next/TypeScript + lint | Same run: actual production build and full eslint exit status 0 | PASS |
+| Real production web interactions | Same run: disposable authenticated owner; Home action, keyboard filters, Learn recall/reveal, bookmarks, drafts/reload, held-save submit race, server hints, correct/wrong answers, prerequisite diagnosis/repair, independent analytics, Back navigation, SAT/Physics isolation, legacy redirect | PASS for exercised journeys |
+| Responsive visual/console evidence | 18 actual route screenshots + accessibility trees at 1440x900, 1280x800, 390x844; no document overflow or captured console errors; representative screenshots inspected across all six routes | PASS for exercised states; not full accessibility certification |
+| Legacy migration | Real foundation engine DB created for two users/three courses; SQLite backup copied; new migrations run twice, legacy rows/notes/pending contexts preserved; original byte SHA unchanged; legacy events excluded from independent evidence | PASS disposable migration; installed learner-data migration still requires native acceptance |
+| Content structure / track boundaries | Audit all eight academic tracks: zero structural failures after deduplication; independent numeric-oracle tests; real SAT/Physics grading/history isolated | PASS technical checks; human editorial review/full blueprint coverage NOT established |
+| Native arm64 build / bundled DMG | Same CI: Swift arm64 compile, self-contained Python/Node/Next DMG; mounted, relocated into path containing spaces; ad-hoc signature verified | PASS build and service smoke; candidate artifact only |
+| Runtime stop/restart / deletion | Real bundled HTTP grade, diagnosis/repair; exact attempts/review dates/queue preserved across full service restart; deleting SAT preserves Physics; no listeners after shutdown | PASS service path; Cocoa quit/reopen not proven |
+| OS-enforced offline | Local sandbox denies external socket with EPERM; real isolated API grades/repairs/restarts under same policy | PASS backend only; full native WebKit offline gate NOT RUN |
+| Actual Cocoa/WebKit | No captured native window. LaunchServices returned -10810 during exhausted storage; Accessibility preflight false, screen capture true | BLOCKED by host/storage/automation access; complete native course→hint/unaided answer→diagnosis→analytics→quit/reopen still required |
+| Clean account / physical M1 / Gatekeeper | CI mounted/relocated candidate only | NOT RUN; must install and open actual candidate in a clean test account |
+| Signing / notarization / updater | `security find-identity -v -p codesigning`: 0 valid identities. Sparkle 2 evaluation retained from foundation ledger history | BLOCKED on Developer ID/notarization credentials and implemented/tested signed feed, update, migration/rollback recovery |
+| Manual Codemagic compatibility | 94f2b16 adds Python/Node Playwright, real UI smoke, full lint gate and evidence artifacts; manual M2 workflow preserved. YAML parsed and all six script blocks passed bash syntax. Existing config checks 2 passed using no disk capture/cache | Configuration checked; Codemagic runner NOT EXECUTED (no paid run) |
 
-## Open release gates
-All integration, browser, native and distribution gates remain pending until actually executed. Official exam simulation/calibration/editorial quality, Debate Prep UX, OS-enforced offline, Gatekeeper and signing/updater constraints must be reported individually.
+Fresh full Apple Silicon recheck [40905363795](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40905363795) at 94f2b16 is IN PROGRESS. Do not treat an unfinished run as passing.
 
-## Next action
-Read full source-suite and production-build output; repair observed failures before proceeding to real-browser journeys.
+## Candidate and evidence
+- [Installable candidate DMG artifact](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40902264623/artifacts/12909878231), archive 349,617,909 bytes, 14-day CI retention. Ad-hoc signed; not approved for release.
+- [Browser evidence](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40902264623/artifacts/12909608786), result.json reports pass, 3 viewports, 18 screenshots, consoleErrors=[].
+- [Production web verification assets](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40902264623/artifacts/12910007969).
+- Local scratch evidence under parent work/: tenet-ci-5.log/browser; tenet-migration.log; tenet-content-audit.json (audit stdout, not JSON); tenet-review-red.log/all.log; tenet-api-smoke/.
+- Local deliverable export into outputs is BLOCKED: a ten-byte write fails with OSError errno 28. Do not mistake existing Oct 28 outputs/STATUS.md for this current checkpoint.
 
-## Current verification diagnostics
-- Actual foundation-engine DB seeded with two users/three courses, copied using SQLite backup, migrated twice: legacy attempts/mastery/notes/queues and pending contexts preserved; migrated events remain legacy-unverified. Original file SHA unchanged. Command `../release-venv/bin/python ../tenet-handoff/verify_foundation_copy.py`; output `../tenet-migration.log`.
-- Fresh local build reached pinned upstream/overlay then managed Python download failed after 3 retries/415s (external timeout). Python Playwright wheel failed after 6 attempts (18.9/43.2 MB). No unproductive repeat of either download.
-- Local recovery uses read-only existing relocatable Python 3.11.18/pylibs/official Node caches from installed app in a separate build folder, followed by the original production Next/Swift/DMG steps. Script `../tenet-resume-build.sh`; log `../tenet-local-build.log`. Fresh CI executes original full build independently.
-- Native preflight: `sandbox-exec` profile with external egress denied/loopback allowed parses successfully. Full network-isolation/GUI test remains pending. Accessibility permission false; screen capture true.
+## Unresolved product gaps — must not be described as completed
+1. Tests route currently launches unseen independent practice; **no full timed SAT/ACT exam engine**, pacing/break/resume or withheld-feedback timed block. No official score prediction or calibration.
+2. **Desmos** is an unverified online iframe/link. Embedding/licensing, network policy, allowed-mode restrictions and meaningful offline calculator behavior require implementation/verification. SVG question graphs are not a calculator.
+3. Curriculum maps current installed families; **full exam/subject coverage, editorial quality, source/license/version/distractor-rationale schema and revision provenance** need completion. Technical structure/numeric checks do not prove editorial correctness or official coverage.
+4. **Debate** code/data/endpoints retained and archived, but no usable entry in the new academic course selector/flows. Restore an accessible separate workflow without deleting records.
+5. **Diagnostic onboarding**, complete configured sets/Solve keyboard and scratchpad acceptance, and deeper difficulty/subskill/error analytics still need explicit implementation/acceptance beyond the tested journeys.
+6. **Crash/fault recovery, backup/restore, corruption/port/startup failures, real installed-data migration**, clean-user Gatekeeper installation, native OS-offline interaction and signed updater/rollback remain unproven. Graceful service restart is narrower evidence.
+7. Learning policies and review intervals are heuristics; withheld-question intervention effectiveness, psychometric calibration, far-transfer validity and learning gains are not established.
 
-## CI and environment blockers (observed)
-- CI [40863435034](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40863435034), code `06b58c1`: **190 passed, 2 skipped**, complete Next/TypeScript and native DMG build passed; relocated runtime/restart/deletion smoke passed. Browser harness failed because it counted Next's hidden route-announcer `role=alert` as a Tenet error. Confirmed in installed Next `app-router-announcer.js`; scope narrowed to application `main`, not coverage removed.
-- Checkpoint `f9567bc`, CI [40867596121](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40867596121) running; added selected-plan-block navigation check and failure screenshot/HTML/accessibility capture.
-- Local npm bootstrap ended `Exit handler never called` after network failures. Recovery copying known cached modules then failed **No space left on device**. `df -h .`: **131 MiB available, 100% capacity**. Removing only this task's generated app and incomplete node_modules; no installed app, learner data or protected source removed. Full local bundled build/DMG is blocked by capacity and download reliability; fresh CI remains available.
+## Observed failures and bounded repairs
+- 40863435034: source/build/DMG services pass; hidden Next route-announcer miscounted as alert. Harness scoped to Tenet main.
+- 40867596121: actual Next→uvicorn proxy ECONNRESET/HTTP500; disabled loopback upstream keep-alive. Later live journey passes without suppressing errors.
+- 40869518241: harness SQLite oracle assumed compact UUIDs; actual DB uses hyphenated UUIDs. Fixed lookup. Three Tenet lint errors and hook warning repaired.
+- 40893508874: 195 passed, 2 skipped, one tooltip sampled before hover transition; added bounded visibility wait. Clean run 40902264623 passes.
+- Local download failures: managed Python 3 retries/415s; Python Playwright 6 retries/partial download; npm bootstrap incomplete. No unproductive repeat.
+- Local later regression: 185 passed, 2 skipped, two temporary SQLite disk-I/O failures. Subsequent pytest capture cannot create any temporary directory. Historical 187/2 local pass is not substituted for those failures.
+- Storage: APFS container 99.9% used, ~115 MiB reported; ten-byte file creation and configuration save return ENOSPC. Removed only task-generated build/cache/extracted copies; did not delete ordinary user files or installed app. No native proof fabricated from HTTP or Playwright.
 
-## Second live failure / repairs
-- CI `40867596121` at `f9567bc`: source suite and full native build passed again; real browser failed on console HTTP 500. Downloaded runtime log shows Next proxy `read ECONNRESET` for `/api/courses/overview`, followed by successful client retry. User-facing interaction recovered but zero-console-error gate correctly failed.
-- Next's installed config type confirms `httpAgentOptions.keepAlive`; patch now disables upstream keep-alive for loopback uvicorn rather than hiding HTTP failures. Browser harness now logs failing response URLs and explicitly exercises idle/reload.
-- Source inspection: Solve dereferenced a missing NAV entry (`Solve` intentionally absent from five-item dock); fixed separate section label without adding a sixth dock icon. Home selected-block action always followed the first plan stage; now maps selected Learn/Solve/review block to Learn/Solve/Analytics. Existing real journey assertions verify both.
-- Native title updated to Tenet; explicit MASTERY_DATA_DIR is honored while default learner location and bundle identity remain unchanged. Ruling: did not reproduce old native override failure by launching against ordinary user data; safety takes priority, actual isolated native startup remains the verification gate.
-- OS sandbox external connect returned EPERM. Real isolated API graded SAT/Physics, produced repair/diagnosis, restarted preserving exact records, and passed deletion isolation under that same policy. This is backend-only offline proof, not native WebKit interaction.
+## Rulings made
+- Use an ordinary isolated Git worktree when native worktree tool rejected nested sourceRoot; cost: app attachment not automatically managed.
+- Mac branch owns runtime/installer and course-slash patch; full ZIP owns intended new learning/UI; never apply historical patches. Cost: reconciliation must be verified by full build/runtime checks.
+- Use supplied Neutral Ink source/screenshots as visual lock; no design re-selection. Cost: live Refero research was not repeated.
+- Keep STATUS.md as sole continuing ledger and treat supplied science plan as source evidence, not a second execution system. Cost: historical checkpoints live in Git history.
+- Treat unknown-skill legacy help conservatively as owner/course exposure when computing delayed retention. Cost: some historical retention excluded until fresh delayed checks.
+- Treat overlapping attempt totals as Important rather than cosmetic; fix bookmark pagination in same integrity pass. Cost: both included in regression/CI scope; no deferred cosmetic minors.
+- Preserve verified application milestone rather than start a large new feature while storage prevents builds/tests; full handoff remains incomplete.
 
-## Independent whole-branch review and repair pass
-- One fresh read-only reviewer reviewed `6cb852c..dea0145`; no Critical defects proven, seven Important findings and two Minor findings. None declined as outside scope. Not ready to merge as a completed handoff.
-- Six SQLite regressions were run against the pre-fix code: **6 failed**, reproducing unlogged selection hints, stale draft resurrection, repeats establishing interleaving, repeated transfer clearing repair, recent unsubmitted help counted as delayed retention, overlapping other-attempt totals (`../tenet-review-red.log`).
-- Backend repair pass: selector no longer returns hints; fresh first-event predicate shared with analytics/sequencing; repeats cannot raise mastery or certify transfer; immutable owner/skill-scoped hint events (including legacy help migration) reset retention and interval cutoffs. Draft writes atomically require the last graded-result revision; stale saves return 409. Other-attempt counts use a union. Focused suite **65 passed**; full non-browser suite **187 passed, 2 skipped** (`../tenet-review-all.log`).
-- Frontend repair pass: serialize/drain draft writes before grading, disable reasoning during submit, send revision tokens; key workspace state to reactive search parameters with Suspense, restoring Back/Forward and query navigation; confidence remains null until explicitly chosen through accessible control. Direct question bookmark state fixes the beyond-120-page issue.
-- Native repair: per-launch instance ID and expected data file must match health response; child liveness is rechecked before opening WebKit. Default storage remains unchanged. Swift compile passes; real ownership/native window proof pending below.
-- Minor regrading: overlapping metric totals affect evidence integrity, so fixed as Important. Bookmark paging defect also fixed in this pass rather than leaving a broken toggle. No deferred cosmetic minors introduced.
-- Third CI `40869518241` at `dea0145`: runtime and Home/Bank/Solve rendering progressed past proxy failure; browser harness failed in its SQLite oracle because it assumed compact UUID storage. Corrected test lookup to accept actual hyphenated UUIDs. Full lint identified only three Tenet errors (unused confidence setter and two unescaped apostrophes), now repaired; hook dependency warning also addressed.
-- Ruling: legacy help with unknown skill provenance conservatively resets retention exposure within that owning course; it must not manufacture delayed evidence. Cost: some historical retention counts may be excluded until fresh delayed checks.
-- Local native verification assembly uses cached runtime symlinks and production web assets from third CI, with a unique bundle identifier to protect the installed app's WebKit profile. It is NOT a self-contained installer or final-version GUI acceptance proof.
+## Next single action
+Free at least 5 GB on the Mac and enable Accessibility for the app controlling native verification. Then fast-forward this isolated worktree from origin (it currently remains eabf06f), retrieve the candidate DMG, and verify actual installed Cocoa/WebKit journey with a disposable data folder under OS-level external-network blocking. Confirm quit/reopen persistence and installed-data migration before any release decision. Continue outstanding product slices only with their own complete build/test gates.
 
-## Current verified repair checkpoint
-Implementation `3dbdf62` pushed; CI https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40893508874 failed in its source-suite stage; diagnostics being retrieved. All seven Important review findings have code changes and regression/CI checks; native ownership and URL/interaction verification remain pending until run. Latest local non-browser result: 187 passed, 2 skipped.
-Native verification did not produce a captured Cocoa window. LaunchServices attempt returned -10810 while disk was exhausted; a following shell failed to create a here-document for the same reason. Removed only this task extracted snapshot and old web assets; installed app, learner data and protected branch unchanged. Native GUI/clean-install/Gatekeeper gates remain BLOCKED, not passed.
-
-Fourth CI at `3dbdf62`: 195 passed, 2 skipped, one preview tooltip test failed because visibility was sampled before its CSS hover transition. Added a bounded condition wait without removing the visibility assertion. Actual local Chromium preview reproduction passed. A later local non-browser rerun had 185 passed, 2 skipped and two `sqlite3.OperationalError: disk I/O error` failures during temporary DB creation; this machine's exhausted storage now prevents reliable local regression. Earlier 187/2 pass is retained as historical evidence, not substituted for this failed run. Committing this test-only repair as a checkpoint and verifying on clean CI.
+Candidate retrieval after storage is available:
+`gh run download 40902264623 --repo codelagoon/SAT-adaptive-framework -n MasteryEngine2-Standalone-M1-DMG -D ../tenet-native-installer`
