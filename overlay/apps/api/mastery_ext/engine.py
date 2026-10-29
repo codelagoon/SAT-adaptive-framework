@@ -92,6 +92,14 @@ def connect():
         conn.execute('ALTER TABLE context ADD COLUMN difficulty_level INTEGER')
     if 'root_level' not in {r['name'] for r in conn.execute('PRAGMA table_info(learning_queue)')}:
         conn.execute('ALTER TABLE learning_queue ADD COLUMN root_level INTEGER')
+    conn.executescript('''
+    CREATE TABLE IF NOT EXISTS hint_exposures (
+      user_id TEXT NOT NULL, course_id TEXT NOT NULL, problem_id TEXT NOT NULL,
+      shown_at TEXT NOT NULL,
+      PRIMARY KEY(user_id,course_id,problem_id)
+    );
+    CREATE INDEX IF NOT EXISTS ix_hint_exposure_owner ON hint_exposures(user_id,course_id);
+    ''')
     analytics.install(conn)
     workspace.install(conn)
     analytics.migrate_legacy(conn)
@@ -129,6 +137,14 @@ def prepare_context(user_id: str, problem_id: str, confidence: int | None, reaso
           (str(user_id), str(problem_id), confidence, reasoning, utcnow().isoformat(), mode, difficulty_level, int(assisted)))
 
 
+def mark_hint_exposure(user_id: str, course_id: str, problem_id: str) -> None:
+    # Server-owned sticky provenance, independent of client help flags.
+    with _LOCK, connect() as conn:
+        conn.execute('''INSERT OR IGNORE INTO hint_exposures
+            (user_id,course_id,problem_id,shown_at) VALUES (?,?,?,?)''',
+            (str(user_id),str(course_id),str(problem_id),utcnow().isoformat()))
+
+
 def record_attempt(*, result_id: str, user_id: str, course_id: str,
                    problem_id: str, skills: list[str], correct: bool,
                    error_category: str | None = None,
@@ -146,7 +162,11 @@ def record_attempt(*, result_id: str, user_id: str, course_id: str,
             ctx = None
         conf = ctx['confidence'] if ctx else None
         reasoning = ctx['reasoning'] if ctx else ''
+        exposure=conn.execute('''SELECT 1 FROM hint_exposures
+            WHERE user_id=? AND course_id=? AND problem_id=?''',
+            (str(user_id),str(course_id),str(problem_id))).fetchone()
         assisted = bool(ctx['assisted']) if ctx else False
+        assisted = bool(assisted or exposure)
         mode = ctx['mode'] if ctx and ctx['mode'] in ('challenge','repair','review','transfer') else 'challenge'
         level = ctx['difficulty_level'] if ctx else None
         now = utcnow()
@@ -467,7 +487,7 @@ def forget_course(user_id: str, course_id: str, problem_ids: list[str] | None = 
     Context is keyed by user+problem (from legacy v0.3); use the owning
     OpenTutor course's IDs to remove only those records, not other courses.
     """
-    names = ('attempts','attempt_events','saved_questions','answer_drafts','mastery','edges','propositions','diagnostic_probes','learning_queue')
+    names = ('hint_exposures','attempts','attempt_events','saved_questions','answer_drafts','mastery','edges','propositions','diagnostic_probes','learning_queue')
     removed: dict[str,int] = {}
     with _LOCK,connect() as conn:
         for name in names:
