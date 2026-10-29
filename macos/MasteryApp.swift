@@ -24,7 +24,7 @@ final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let rect = NSRect(x: 0, y: 0, width: 1380, height: 900)
         window = NSWindow(contentRect: rect, styleMask: [.titled, .closable, .resizable, .miniaturizable],
                           backing: .buffered, defer: false)
-        window.title = "Mastery Engine 2"
+        window.title = "Tenet"
         window.center()
         window.minSize = NSSize(width: 1050, height: 650)
         let config = WKWebViewConfiguration()
@@ -47,7 +47,7 @@ final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         body{margin:0;background:#0c1018;color:#e9edf4;font-family:-apple-system,system-ui;
         display:grid;place-items:center;height:100vh}main{max-width:620px;padding:35px;text-align:center}
         h1{font-size:28px;letter-spacing:-.6px}p{line-height:1.6;color:#98a9bf;font-size:14px}
-        </style></head><body><main><h1>Mastery Engine 2</h1><p>\(safe)</p></main></body></html>
+        </style></head><body><main><h1>Tenet</h1><p>\(safe)</p></main></body></html>
         """, baseURL: nil)
     }
 
@@ -81,7 +81,7 @@ final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         env["DEEPTUTOR_HOME"] = "\(installRoot)/deeptutor-data"
         let oldPath = env["PATH"] ?? "/usr/bin:/bin"
         env["PATH"] = "\(installRoot)/deeptutor-venv/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:\(oldPath)"
-        env["MASTERY_DATA_DIR"] = "\(home)/Library/Application Support/MasteryEngine2"
+        env["MASTERY_DATA_DIR"] = env["MASTERY_DATA_DIR"] ?? "\(home)/Library/Application Support/MasteryEngine2"
         task.environment = env
         task.standardOutput = log
         task.standardError = log

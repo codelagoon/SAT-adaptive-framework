@@ -47,6 +47,16 @@ npm ci --no-audit --no-fund
 NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_API_URL='http://127.0.0.1:18765/api' \
   NODE_OPTIONS='--max-old-space-size=4096' npm run build
 [[ -f "${WEB}/.next/BUILD_ID" ]] || { echo 'Next.js production build failed' >&2; exit 1; }
+if [[ "${TENET_LINT:-0}" == 1 ]]; then
+  # Keep the native build usable for diagnostics; CI gates publication on the
+  # recorded lint status after also exercising real learner interactions.
+  mkdir -p "${SOURCE_DIR}/build"
+  if npm run lint > "${SOURCE_DIR}/build/tenet-eslint.log" 2>&1; then
+    echo 0 > "${SOURCE_DIR}/build/tenet-eslint.status"
+  else
+    echo 1 > "${SOURCE_DIR}/build/tenet-eslint.status"
+  fi
+fi
 npm prune --omit=dev --no-audit --no-fund
 # Avoid shipping build caches, VCS, backups, and any configuration secrets.
 rm -rf "${WEB}/.next/cache"

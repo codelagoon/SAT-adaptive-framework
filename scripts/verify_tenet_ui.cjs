@@ -42,12 +42,15 @@ function keyFor(id) {
     activePage = page;
     page.on('pageerror', e => errors.push(String(e)));
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+    page.on('response', r => { if(r.status()>=400) errors.push(`${r.status()} ${r.url()}`); });
     async function visit(route, heading) {
       await page.goto(base + route, { waitUntil: 'networkidle' });
       if (heading) await page.getByRole('heading', { name: heading, exact: true }).waitFor();
       assert.equal(await page.locator('main').getByRole('alert').count(), 0, await page.locator('body').innerText());
       assert.deepEqual(errors, [], 'Browser console/page errors');
     }
+    await visit(`/mastery?courseId=${course}`, 'Study queue');
+    await page.waitForTimeout(6500);
     await visit(`/mastery?courseId=${course}`, 'Study queue');
     await page.getByRole('button', {name:/TN-002/}).click();
     const recommendation = page.getByRole('complementary', {name:'Selected recommendation details'}).getByRole('link');

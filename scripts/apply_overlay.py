@@ -44,6 +44,8 @@ WEB_COURSE_PATCH='''        {
           destination: `${API_URL}/courses/`,
         },
 '''+WEB_COURSE_ANCHOR
+WEB_AGENT_ANCHOR='const nextConfig: NextConfig = {\n'
+WEB_AGENT_PATCH=WEB_AGENT_ANCHOR+'  // Local uvicorn closes idle sockets; avoid stale proxy connections.\n  httpAgentOptions: { keepAlive: false },\n'
 SIDEBAR_ANCHOR='''        <button
           type="button"
           onClick={() => onNavigate("/settings")}
@@ -106,6 +108,7 @@ def apply(target:Path):
         ('apps/api/routers/quiz_submission.py',RESPONSE_ID_ANCHOR,RESPONSE_ID_PATCH),
         ('apps/web/src/app/_components/dashboard-sidebar.tsx',SIDEBAR_ANCHOR,SIDEBAR_PATCH),
         ('apps/web/next.config.ts',WEB_COURSE_ANCHOR,WEB_COURSE_PATCH),
+        ('apps/web/next.config.ts',WEB_AGENT_ANCHOR,WEB_AGENT_PATCH),
         ('apps/web/src/app/layout.tsx',FONT_IMPORT,''),
         ('apps/web/src/app/layout.tsx',FONT_CONFIG,''),
         ('apps/web/src/app/layout.tsx',FONT_CLASS,'className="font-sans"'),

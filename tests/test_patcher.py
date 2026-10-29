@@ -14,7 +14,7 @@ def fixture_source(tmp_path):
       'apps/api/services/router_registry.py':f'begin\n{installer.ROUTER_ANCHOR}\nend',
       'apps/api/routers/quiz_submission.py':f'begin\n{installer.CLASSIFIER_ANCHOR}\n{installer.SUBMISSION_ANCHOR}\n{installer.RESPONSE_ID_ANCHOR}\nend',
       'apps/api/routers/courses_crud.py':f'begin\n{installer.DELETE_COURSE_ANCHOR}\nend',
-      'apps/web/next.config.ts':f'const beforeFiles=[\n{installer.WEB_COURSE_ANCHOR}\n]',
+      'apps/web/next.config.ts':f'const nextConfig: NextConfig = {{\n  async rewrites() {{ return {{ beforeFiles:[\n{installer.WEB_COURSE_ANCHOR}\n] }}; }}\n}}; export default nextConfig;',
         'apps/web/src/app/_components/dashboard-sidebar.tsx':f'begin\n{installer.SIDEBAR_ANCHOR}\nend',
       'apps/web/src/app/layout.tsx':f'{installer.FONT_IMPORT}\n{installer.FONT_CONFIG}\n<html {installer.FONT_CLASS}>',
       'scripts/quickstart.sh':f'#!/bin/bash\n{installer.FASTSETUP_ANCHOR}\n{installer.WEB_BIND_ANCHOR}\n',

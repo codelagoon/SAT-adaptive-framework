@@ -23,7 +23,7 @@ type SolveQuestion = { effective_mode?:"challenge"|"repair"|"review"|"transfer";
 type Grade = { result_id: string; is_correct: boolean; correct_answer: string|null; explanation: string|null };
 type SkillMetric = { skill: string; correct: number; total: number; accuracy: number|null; independent_median_ms: number|null; all_attempts: number; sample_warning: boolean };
 type Analytics = { delayed_retention?:{correct:number;total:number;accuracy:number|null};independent_transfer?:{correct:number;total:number;accuracy:number|null}; sample_count: number; independent_first_attempts: {correct:number;total:number;accuracy:number|null}; assisted_attempts: {total:number}; repeat_attempts: {total:number}; legacy_unverified_attempts: {total:number}; timing: {independent_median_ms:number|null;correct_median_ms:number|null;wrong_median_ms:number|null}; skills:SkillMetric[]; daily:{date:string;correct:number;total:number;accuracy:number|null}[]; next_action:string; limitations:string[] };
-type StudyPlan = { stage:string; reason:string; target_skill:string; steps:{mode:string;minutes:number}[]; lesson?:unknown };
+type StudyPlan = { stage:string; reason:string; target_skill:string; steps:{mode:string;minutes:number;skill?:string;task?:string}[]; lesson?:unknown };
 type OfflineHelp = { hint:string; principle:string; worked_example:string; transfer_check:string };
 type Probe = { probe_id:string; question:string; options:Record<string,string> };
 type Diagnosis = { correct:boolean; hypothesis?:string; certainty?:string; verification?:string; evidence?:string; probe?:Probe|null };
@@ -333,7 +333,13 @@ export default function MasteryWorkspace({section}:{section:Section}) {
  }
  const allSkills=useMemo(()=>curriculum?.domains.flatMap(d=>d.skills.map(s=>({...s,domain:d.name})))??[],[curriculum]);
  const chosenLesson=allSkills.find(s=>s.name===lessonSkill)||allSkills[0];
- const selectedNav=NAV.find(n=>n.id===section)!;
+ const sectionLabel=section==="solve"?"Solve":NAV.find(n=>n.id===section)?.label??"Home";
+ const selectedStep=plan?.steps?.[selectedPlanStep];
+ const selectedSkill=selectedStep?.skill||plan?.target_skill||"";
+ const recommendationHref=selectedStep?.mode==="learn"?link("learn",`&skill=${encodeURIComponent(selectedSkill)}`):
+   selectedStep?.mode==="review"?link("analytics"):
+   link("solve",`&mode=${plan?.stage==="review"?"review":"challenge"}&skill=${encodeURIComponent(selectedSkill)}`);
+ const recommendationLabel=selectedStep?.mode==="learn"?"Review concept":selectedStep?.mode==="review"?"Review performance":"Start studying";
  if(booting)return <main className={styles.boot}>Loading your study workspace…</main>;
  return <div className={`${styles.shell} ${section==="solve"?styles.focusMode:""}`}>
   <aside className={styles.side} aria-label="Primary navigation">
@@ -344,7 +350,7 @@ export default function MasteryWorkspace({section}:{section:Section}) {
   </aside>
   <div className={styles.main}>
    <header className={styles.header}>
-    <div className={styles.crumb}>Tenet <span>/</span> <strong>{selectedNav.label}</strong></div>
+    <div className={styles.crumb}>Tenet <span>/</span> <strong>{sectionLabel}</strong></div>
     <div className={styles.courseSelect}><span>Course</span><PremiumSelect label="Active course" value={courseId} options={[{value:"",label:"Select a course"},...courses.filter(c=>TRACKS.includes(c.name)).map(c=>({value:c.id,label:c.name}))]} onChange={id=>{setCourseId(id);router.push(safePath(section,id))}} /></div>
    </header>
    <main className={styles.content}>
@@ -372,8 +378,8 @@ export default function MasteryWorkspace({section}:{section:Section}) {
          <div className={styles.inspectorBody}>
           <div className={styles.eyebrow}>RECOMMENDED / {currentTrack}</div>
           <h2>{selectedPlanStep===0?(plan?.target_skill||"Begin your first practice"):(plan?.steps?.[selectedPlanStep]?.mode?.replace(/_/g," ")||"Study block")}</h2>
-          <p>{selectedPlanStep===0?(plan?.reason||"Complete independent questions to generate a personalized study sequence."):"The next step in your personalized study sequence."}</p>
-          <Link className={styles.primary} href={plan?.stage==="repair"||plan?.stage==="diagnose"?link("learn",`&skill=${encodeURIComponent(plan.target_skill)}`):link("solve",plan?`&mode=${plan.stage==="review"?"review":"challenge"}&skill=${encodeURIComponent(plan.target_skill)}`:"")}>{plan?.stage==="repair"||plan?.stage==="diagnose"?"Review concept":"Start studying"} ↗</Link>
+          <p>{selectedPlanStep===0?(plan?.reason||"Complete independent questions to generate a personalized study sequence."):(selectedStep?.task||"The next step in your personalized study sequence.")}</p>
+          <Link className={styles.primary} href={recommendationHref}>{recommendationLabel} ↗</Link>
           <div className={styles.inspectorRule}/>
           <div className={styles.inspectorProperty}><span>Track</span><strong>{currentTrack}</strong></div>
           <div className={styles.inspectorProperty}><span>Activity</span><strong>{plan?.steps?.[selectedPlanStep]?.mode?.replace(/_/g," ")??"Practice"}</strong></div>

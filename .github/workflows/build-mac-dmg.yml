@@ -26,13 +26,17 @@ jobs:
           uv run --with pytest --with playwright --python 3.11 python -m pytest tests/ -q
           for script in scripts/*.sh; do bash -n "$script" || exit; done
       - name: Build portable app and DMG
-        run: bash scripts/build_portable_macos.sh
+        run: TENET_LINT=1 bash scripts/build_portable_macos.sh
       - name: Smoke test bundled runtime (no system Python or Node)
         run: |
           export TENET_UI_E2E=1
           export PLAYWRIGHT_MODULE="${RUNNER_TEMP}/tenet-browser/node_modules/playwright"
           export CHROMIUM_EXECUTABLE="$(uv run --with pytest --with playwright --python 3.11 python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
           bash scripts/codemagic_smoke.sh
+      - name: Require full frontend lint gate
+        run: |
+          cat build/tenet-eslint.log
+          test "$(cat build/tenet-eslint.status)" = 0
       - name: Upload installable DMG artifact
         uses: actions/upload-artifact@v4
         with:
@@ -55,4 +59,13 @@ jobs:
           path: |
             build/ui-evidence/
             build/preview-screenshots/
+            build/tenet-eslint.*
+          if-no-files-found: ignore
+      - name: Upload web assets for isolated native verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tenet-Web-Verification-Assets
+          path: build/Mastery Engine 2.app/Contents/Resources/opentutor/apps/web/.next/
+          include-hidden-files: true
           if-no-files-found: ignore
