@@ -50,6 +50,8 @@ def test_tooltip_and_keyboard_navigation(browser):
     page.set_content(Path(HTML_PATH).read_text(),wait_until="load")
     item=page.get_by_role('button',name='Question Bank')
     item.hover()
+    page.wait_for_function("e=>getComputedStyle(e,'::after').visibility==='visible'",
+                           arg=item.element_handle(),timeout=5000)
     assert item.evaluate("e=>getComputedStyle(e,'::after').visibility")=='visible'
     page.wait_for_function("() => getComputedStyle(document.querySelector('.navItem[data-page=\"Question Bank\"]'),'::after').opacity === '1'")
     item.focus()
