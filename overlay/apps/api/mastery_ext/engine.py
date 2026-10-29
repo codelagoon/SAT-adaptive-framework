@@ -14,6 +14,7 @@ import sqlite3
 import threading
 import json
 import uuid
+from mastery_ext import analytics, workspace
 
 _LOCK = threading.RLock()
 P_INIT, P_GUESS, P_SLIP, P_LEARN = 0.20, 0.20, 0.10, 0.12
@@ -91,6 +92,19 @@ def connect():
         conn.execute('ALTER TABLE context ADD COLUMN difficulty_level INTEGER')
     if 'root_level' not in {r['name'] for r in conn.execute('PRAGMA table_info(learning_queue)')}:
         conn.execute('ALTER TABLE learning_queue ADD COLUMN root_level INTEGER')
+    conn.executescript('''
+    CREATE TABLE IF NOT EXISTS hint_exposures (
+      user_id TEXT NOT NULL, course_id TEXT NOT NULL, problem_id TEXT NOT NULL,
+      shown_at TEXT NOT NULL,
+      PRIMARY KEY(user_id,course_id,problem_id)
+    );
+    CREATE INDEX IF NOT EXISTS ix_hint_exposure_owner ON hint_exposures(user_id,course_id);
+    ''')
+    analytics.install(conn)
+    workspace.install(conn)
+    analytics.migrate_legacy(conn)
+    if 'assisted' not in {r['name'] for r in conn.execute('PRAGMA table_info(context)')}:
+        conn.execute('ALTER TABLE context ADD COLUMN assisted INTEGER NOT NULL DEFAULT 0')
     return conn
 
 
@@ -105,7 +119,7 @@ def update_bkt(prior: float, correct: bool) -> float:
 
 
 def prepare_context(user_id: str, problem_id: str, confidence: int | None, reasoning: str,
-                    mode: str = 'challenge', difficulty_level: int | None = None):
+                    mode: str = 'challenge', difficulty_level: int | None = None, assisted: bool = False):
     if confidence is not None and not 1 <= confidence <= 5:
         raise ValueError('Confidence must be 1–5')
     if len(reasoning) > 2500:
@@ -115,12 +129,20 @@ def prepare_context(user_id: str, problem_id: str, confidence: int | None, reaso
     if difficulty_level is not None and difficulty_level not in (1,2,3):
         raise ValueError('Difficulty must be 1, 2, or 3')
     with _LOCK, connect() as conn:
-        conn.execute('''INSERT INTO context(user_id,problem_id,confidence,reasoning,prepared_at,mode,difficulty_level)
-          VALUES (?,?,?,?,?,?,?)
+        conn.execute('''INSERT INTO context(user_id,problem_id,confidence,reasoning,prepared_at,mode,difficulty_level,assisted)
+          VALUES (?,?,?,?,?,?,?,?)
           ON CONFLICT(user_id,problem_id) DO UPDATE SET
           confidence=excluded.confidence, reasoning=excluded.reasoning,
-          prepared_at=excluded.prepared_at, mode=excluded.mode, difficulty_level=excluded.difficulty_level''',
-          (str(user_id), str(problem_id), confidence, reasoning, utcnow().isoformat(), mode, difficulty_level))
+          prepared_at=excluded.prepared_at, mode=excluded.mode, difficulty_level=excluded.difficulty_level, assisted=excluded.assisted''',
+          (str(user_id), str(problem_id), confidence, reasoning, utcnow().isoformat(), mode, difficulty_level, int(assisted)))
+
+
+def mark_hint_exposure(user_id: str, course_id: str, problem_id: str) -> None:
+    # Server-owned sticky provenance, independent of client help flags.
+    with _LOCK, connect() as conn:
+        conn.execute('''INSERT OR IGNORE INTO hint_exposures
+            (user_id,course_id,problem_id,shown_at) VALUES (?,?,?,?)''',
+            (str(user_id),str(course_id),str(problem_id),utcnow().isoformat()))
 
 
 def record_attempt(*, result_id: str, user_id: str, course_id: str,
@@ -133,16 +155,27 @@ def record_attempt(*, result_id: str, user_id: str, course_id: str,
     with _LOCK, connect() as conn:
         if conn.execute('SELECT 1 FROM attempts WHERE result_id=? LIMIT 1', (str(result_id),)).fetchone():
             return False
-        ctx = conn.execute('SELECT confidence,reasoning,prepared_at,mode,difficulty_level FROM context WHERE user_id=? AND problem_id=?',
+        ctx = conn.execute('SELECT confidence,reasoning,prepared_at,mode,difficulty_level,assisted FROM context WHERE user_id=? AND problem_id=?',
                            (str(user_id),str(problem_id))).fetchone()
         # Ignore stale pre-answer context older than an hour.
         if ctx and (utcnow() - parse_utc(ctx['prepared_at'])).total_seconds() > 3600:
             ctx = None
         conf = ctx['confidence'] if ctx else None
         reasoning = ctx['reasoning'] if ctx else ''
+        exposure=conn.execute('''SELECT 1 FROM hint_exposures
+            WHERE user_id=? AND course_id=? AND problem_id=?''',
+            (str(user_id),str(course_id),str(problem_id))).fetchone()
+        assisted = bool(ctx['assisted']) if ctx else False
+        assisted = bool(assisted or exposure)
         mode = ctx['mode'] if ctx and ctx['mode'] in ('challenge','repair','review','transfer') else 'challenge'
         level = ctx['difficulty_level'] if ctx else None
         now = utcnow()
+        analytics.add_event(conn, result_id=result_id, user_id=user_id, course_id=course_id,
+            problem_id=problem_id, skills=skills, correct=correct,
+            assisted=assisted, mode=mode,
+            difficulty_level=level, elapsed_ms=elapsed_ms, confidence=conf,
+            error_category=error_category, reasoning=reasoning,
+            recorded_at=now.isoformat())
         for i, skill in enumerate(skills):
             event_id = str(result_id) if i == 0 else f'{result_id}:{i}'
             conn.execute('''INSERT INTO attempts VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
@@ -167,11 +200,17 @@ def record_attempt(*, result_id: str, user_id: str, course_id: str,
             p = min(1.0, prior + .03) if mode == 'repair' and correct else update_bkt(prior, correct)
             n = int(previous['n'])+1 if previous else 1
             streak = (int(previous['streak']) if previous else 0) + (1 if mode != 'repair' else 0) if correct else 0
+            # An assisted correct answer is practice, not fresh independent mastery.
+            if assisted and correct:
+                p = prior
+                streak = int(previous['streak']) if previous else 0
             # Graduated review intervals are a transparent heuristic, not calibrated FSRS.
             days = [0,1,3,7,14,30,60][min(streak,6)] if correct else 0
             due_at = now + (timedelta(days=days) if correct else timedelta(minutes=15))
             if mode == 'repair' and correct and previous:
                 due_at = parse_utc(previous['due_at'])  # foundation pass cannot erase review debt
+            if assisted and correct:
+                due_at = parse_utc(previous['due_at']) if previous else now
             if verified_transfer and correct:
                 due_at = now + timedelta(minutes=30)  # independent retention evidence still due
             elif mode == 'transfer' and correct and previous:
@@ -182,7 +221,9 @@ def record_attempt(*, result_id: str, user_id: str, course_id: str,
               p=excluded.p,n=excluded.n,due_at=excluded.due_at,last_at=excluded.last_at,
               streak=excluded.streak''',
               (str(user_id),str(course_id),skill,p,n,due_at.isoformat(),now.isoformat(),streak))
-            if not correct:
+            if assisted and correct:
+                phase = prior_phase  # Guided answers cannot clear the repair queue.
+            elif not correct:
                 phase = 'repair'
                 # A new failure redefines the target if it was a challenge.
                 if prior_phase == 'challenge' or root_level is None:
@@ -203,6 +244,7 @@ def record_attempt(*, result_id: str, user_id: str, course_id: str,
                 phase=excluded.phase,updated_at=excluded.updated_at,
                 last_problem_id=excluded.last_problem_id,root_level=excluded.root_level''',
                 (str(user_id),str(course_id),skill,phase,now.isoformat(),str(problem_id),root_level))
+        workspace.clear_draft(conn,str(user_id),str(course_id),str(problem_id))
         conn.execute('DELETE FROM context WHERE user_id=? AND problem_id=?',(str(user_id),str(problem_id)))
     return True
 
@@ -445,7 +487,7 @@ def forget_course(user_id: str, course_id: str, problem_ids: list[str] | None = 
     Context is keyed by user+problem (from legacy v0.3); use the owning
     OpenTutor course's IDs to remove only those records, not other courses.
     """
-    names = ('attempts','mastery','edges','propositions','diagnostic_probes','learning_queue')
+    names = ('hint_exposures','attempts','attempt_events','saved_questions','answer_drafts','mastery','edges','propositions','diagnostic_probes','learning_queue')
     removed: dict[str,int] = {}
     with _LOCK,connect() as conn:
         for name in names:

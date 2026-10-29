@@ -22,7 +22,10 @@ from mastery_ext.offline_diagnosis import diagnose
 from mastery_ext.offline_probes import probe_for, public_probe, evaluate
 from services.auth.dependency import get_current_user
 from services.course_access import get_course_or_404
-from mastery_ext import engine
+from mastery_ext import engine, analytics, workspace
+from mastery_ext.curriculum import get_track, select_diagnostic
+from mastery_ext.question_audit import audit as audit_questions
+from mastery_ext.study_planner import recommend as recommend_study
 
 router=APIRouter()
 
@@ -37,6 +40,14 @@ class Prepared(BaseModel):
     confidence: int | None = Field(None,ge=1,le=5)
     reasoning: str = Field('',max_length=2500)
     mode: str = Field('challenge',pattern='^(challenge|repair|review|transfer)$')
+    assisted: bool = False
+
+class BookmarkRequest(BaseModel):
+    saved: bool
+
+class DraftRequest(BaseModel):
+    response: str = Field('',max_length=1500)
+    reasoning: str = Field('',max_length=2500)
 
 class Edge(BaseModel):
     prerequisite: str = Field(min_length=1,max_length=120)
@@ -68,6 +79,12 @@ async def overview(course_id:uuid.UUID,user:User=Depends(get_current_user),db:As
     await get_course_or_404(db,course_id,user_id=user.id)
     return engine.summary(str(user.id),str(course_id))
 
+@router.get('/courses/{course_id}/analytics')
+async def learning_analytics(course_id:uuid.UUID,user:User=Depends(get_current_user),db:AsyncSession=Depends(get_db)):
+    await get_course_or_404(db,course_id,user_id=user.id)
+    with engine.connect() as conn:
+        return analytics.report(conn,str(user.id),str(course_id))
+
 class Proposition(BaseModel):
     claim: str = Field(min_length=4,max_length=500)
     premises: list[str] = Field(default_factory=list,max_length=12)
@@ -83,6 +100,130 @@ async def add_proposition(course_id:uuid.UUID,body:Proposition,user:User=Depends
     try:
         return engine.add_proposition(str(user.id),str(course_id),body.claim,body.premises)
     except ValueError as exc:raise HTTPException(422,str(exc)) from exc
+
+@router.get('/courses/{course_id}/study-plan')
+async def study_plan(course_id:uuid.UUID,minutes:int=20,
+        user:User=Depends(get_current_user),db:AsyncSession=Depends(get_db)):
+    course=await get_course_or_404(db,course_id,user_id=user.id)
+    with engine.connect() as conn:
+        data=analytics.report(conn,str(user.id),str(course_id))
+    mastery=engine.summary(str(user.id),str(course_id))
+    try:return recommend_study(track_for(course),data,mastery,minutes=minutes)
+    except ValueError:raise HTTPException(422,'Invalid track or duration')
+
+@router.put('/courses/{course_id}/questions/{problem_id}/bookmark')
+async def set_bookmark(course_id:uuid.UUID,problem_id:uuid.UUID,body:BookmarkRequest,
+        user:User=Depends(get_current_user),db:AsyncSession=Depends(get_db)):
+    await get_course_or_404(db,course_id,user_id=user.id)
+    problem=await db.scalar(select(PracticeProblem).where(PracticeProblem.id==problem_id,
+        PracticeProblem.course_id==course_id,PracticeProblem.source=='mastery_offline'))
+    if problem is None:raise HTTPException(404,'Question not found')
+    with engine.connect() as conn:
+        return workspace.bookmark(conn,str(user.id),str(course_id),str(problem_id),body.saved)
+
+@router.put('/courses/{course_id}/questions/{problem_id}/draft')
+async def save_question_draft(course_id:uuid.UUID,problem_id:uuid.UUID,body:DraftRequest,
+        user:User=Depends(get_current_user),db:AsyncSession=Depends(get_db)):
+    await get_course_or_404(db,course_id,user_id=user.id)
+    problem=await db.scalar(select(PracticeProblem).where(PracticeProblem.id==problem_id,
+        PracticeProblem.course_id==course_id,PracticeProblem.source=='mastery_offline'))
+    if problem is None:raise HTTPException(404,'Question not found')
+    with engine.connect() as conn:
+        return workspace.save_draft(conn,str(user.id),str(course_id),str(problem_id),
+            body.response,body.reasoning)
+
+@router.get('/courses/{course_id}/questions/{problem_id}/draft')
+async def get_question_draft(course_id:uuid.UUID,problem_id:uuid.UUID,
+        user:User=Depends(get_current_user),db:AsyncSession=Depends(get_db)):
+    await get_course_or_404(db,course_id,user_id=user.id)
+    problem=await db.scalar(select(PracticeProblem).where(PracticeProblem.id==problem_id,
+        PracticeProblem.course_id==course_id,PracticeProblem.source=='mastery_offline'))
+    if problem is None:raise HTTPException(404,'Question not found')
+    with engine.connect() as conn:
+        return {'draft':workspace.read_draft(conn,str(user.id),str(course_id),str(problem_id))}
+
+@router.get('/courses/{course_id}/questions')
+async def browse_questions(course_id:uuid.UUID, skill:str='', difficulty:int=0,
+        query:str='', status:str='all',
+        limit:int=120, offset:int=0, user:User=Depends(get_current_user),
+        db:AsyncSession=Depends(get_db)):
+    """Safe browsing metadata; never return keys, hints or solutions."""
+    await get_course_or_404(db,course_id,user_id=user.id)
+    if len(skill)>120 or len(query)>120 or status not in ('all','unseen','attempted','bookmarked') or difficulty not in (0,1,2,3) or not 1<=limit<=120 or not 0<=offset<=10000:
+        raise HTTPException(422,'Invalid question filter')
+    criteria=[PracticeProblem.course_id==course_id,PracticeProblem.is_archived==False,
+              PracticeProblem.source=='mastery_offline']
+    if difficulty:criteria.append(PracticeProblem.difficulty_layer==difficulty)
+    # Filter after fetching canonical question records, since knowledge_points
+    # is a JSON list and backend DB drivers vary in JSON containment support.
+    rows=(await db.execute(select(PracticeProblem).where(*criteria)
+             .order_by(PracticeProblem.order_index).limit(11000))).scalars().all()
+    with engine.connect() as conn:
+        bookmarks=workspace.saved_ids(conn,str(user.id),str(course_id))
+        attempted={r[0] for r in conn.execute('SELECT DISTINCT problem_id FROM attempt_events WHERE user_id=? AND course_id=?',
+                                           (str(user.id),str(course_id))).fetchall()}
+    results=[]
+    for p in rows:
+        tags=p.knowledge_points if isinstance(p.knowledge_points,list) else []
+        if skill and skill not in tags:continue
+        if query and query.casefold() not in (p.question or '').casefold() and not any(query.casefold() in t.casefold() for t in tags):continue
+        if status=='bookmarked' and str(p.id) not in bookmarks:continue
+        if status=='attempted' and str(p.id) not in attempted:continue
+        if status=='unseen' and str(p.id) in attempted:continue
+        meta=p.problem_metadata if isinstance(p.problem_metadata,dict) else {}
+        results.append({'id':str(p.id),'question':p.question,
+            'skills':tags,'difficulty_layer':p.difficulty_layer,
+            'family':meta.get('family') or ('authored' if meta.get('authored') else 'unknown'),
+            'source':'mastery_offline','official':False,
+            'bookmarked':str(p.id) in bookmarks,'attempted':str(p.id) in attempted})
+    return {'total':len(results),'offset':offset,'limit':limit,'questions':results[offset:offset+limit],
+            'notice':'Original unofficial exercises; levels are not independently calibrated.'}
+
+@router.get('/courses/{course_id}/questions/{problem_id}')
+async def get_solve_question(course_id:uuid.UUID,problem_id:uuid.UUID,
+        user:User=Depends(get_current_user),db:AsyncSession=Depends(get_db)):
+    await get_course_or_404(db,course_id,user_id=user.id)
+    p=await db.scalar(select(PracticeProblem).where(PracticeProblem.id==problem_id,
+          PracticeProblem.course_id==course_id,PracticeProblem.source=='mastery_offline',
+          PracticeProblem.is_archived==False))
+    if p is None:raise HTTPException(404,'Question not found')
+    meta=p.problem_metadata if isinstance(p.problem_metadata,dict) else {}
+    return {'id':str(p.id),'question':p.question,'question_type':p.question_type,
+            'options':p.options,'difficulty_layer':p.difficulty_layer,
+            'skills':p.knowledge_points or [],'graph':meta.get('graph'),
+            'official':False,'source':'mastery_offline'}
+
+@router.get('/courses/{course_id}/curriculum')
+async def curriculum(course_id:uuid.UUID,user:User=Depends(get_current_user),db:AsyncSession=Depends(get_db)):
+    course=await get_course_or_404(db,course_id,user_id=user.id)
+    track=track_for(course)
+    try:return get_track(track)
+    except ValueError:raise HTTPException(422,'No verified curriculum for this track')
+
+@router.get('/courses/{course_id}/diagnostic')
+async def diagnostic(course_id:uuid.UUID,size:int=12,user:User=Depends(get_current_user),db:AsyncSession=Depends(get_db)):
+    if not 4<=size<=20:raise HTTPException(422,'Diagnostic size must be 4–20')
+    course=await get_course_or_404(db,course_id,user_id=user.id)
+    result=await db.execute(select(PracticeProblem).where(
+        PracticeProblem.course_id==course_id, PracticeProblem.is_archived==False,
+        PracticeProblem.source=='mastery_offline').order_by(PracticeProblem.order_index).limit(3500))
+    questions=[{'id':str(p.id),'question':p.question,'options':p.options,
+                'knowledge_points':p.knowledge_points or [],'difficulty_layer':p.difficulty_layer}
+               for p in result.scalars().all()]
+    try:return select_diagnostic(questions,track_for(course),max_questions=size)
+    except ValueError:raise HTTPException(422,'No verified diagnostic for this track')
+
+@router.get('/courses/{course_id}/question-audit')
+async def question_audit(course_id:uuid.UUID,user:User=Depends(get_current_user),db:AsyncSession=Depends(get_db)):
+    await get_course_or_404(db,course_id,user_id=user.id)
+    result=await db.execute(select(PracticeProblem).where(
+        PracticeProblem.course_id==course_id,PracticeProblem.source=='mastery_offline',
+        PracticeProblem.is_archived==False).order_by(PracticeProblem.order_index).limit(3500))
+    items=[{'question':p.question,'options':p.options,'correct_answer':p.correct_answer,
+        'explanation':p.explanation,'knowledge_points':p.knowledge_points,
+        'difficulty_layer':p.difficulty_layer,'problem_metadata':p.problem_metadata}
+        for p in result.scalars().all()]
+    return audit_questions(items)
 
 @router.get('/courses/{course_id}/starting-priorities')
 async def starting_priorities(course_id:uuid.UUID,user:User=Depends(get_current_user),db:AsyncSession=Depends(get_db)):
@@ -258,7 +399,7 @@ async def prepare(body:Prepared,user:User=Depends(get_current_user),db:AsyncSess
                                                          PracticeProblem.course_id==body.course_id))
     if problem is None:raise HTTPException(404,'Question not found in this course')
     engine.prepare_context(str(user.id),str(body.problem_id),body.confidence,body.reasoning,
-                           body.mode,problem.difficulty_layer)
+                           body.mode,problem.difficulty_layer,body.assisted)
     return {'saved':True}
 
 @router.put('/courses/{course_id}/edges')

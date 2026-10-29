@@ -126,7 +126,7 @@ def test_patcher_prevents_offline_model_calls():
 
 
 def test_frontend_shows_graph_and_study_offline():
-    page=(ROOT/'overlay/apps/web/src/app/mastery/page.tsx').read_text()
+    page=(ROOT/'overlay/apps/web/src/app/mastery/legacy/page.tsx').read_text()
     assert 'offline-help' in page and 'expand' in page
     assert 'ProblemGraph' in page
     assert 'question.reason' in page
