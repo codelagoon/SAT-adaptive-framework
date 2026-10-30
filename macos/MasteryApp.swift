@@ -153,6 +153,9 @@ final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        // Loading the ready workspace can cancel the startup document normally.
+        let failure = error as NSError
+        if failure.domain == NSURLErrorDomain && failure.code == NSURLErrorCancelled { return }
         showWaiting("Connection to local OpenTutor was interrupted. Restart the app if needed.")
     }
 

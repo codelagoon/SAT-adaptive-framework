@@ -1,9 +1,9 @@
 # Tenet — verified integration checkpoint, 2026-10-29
 
-**INCOMPLETE / NOT RELEASE-READY.** The integration and installer repair are a verified milestone. Full handoff acceptance still has the open gates below.
+**INCOMPLETE / NOT RELEASE-READY.** The current UI improvement and installer/runtime checks pass. Full handoff acceptance still has the open gates below.
 
 ## Source
-- Branch: `codex/tenet-integrated`; application/configuration code: `a40b32ec2b6893678636e9ce9596288abdf5f41b`. Later ledger-only commits do not change that tested application tree.
+- Branch: `codex/tenet-integrated`; latest tested application/configuration code: `e8e511e06d3de8a7988cf8008c6eff1557a7b257`. Later ledger-only commits do not change that tested application tree.
 - Protected foundation: `6cb852c588c13c707b9bcc1e2971aa07d118ee25`, preserved; no merge/force push/public release/paid Codemagic run.
 - Spec: complete attached handoff dated 2026-10-29 and GitHub issue #2. Inner ZIP SHA-256 `b587011df54dea8b3e9d53c44518fee7131b9b42d98a5d0712f6f379caabcf31`; CRC verified.
 - Isolated worktree: `/Users/george/Documents/Codex/2026-10-28/x20/work/tenet-integrated`. Outputs: `/Users/george/Documents/Codex/2026-10-28/x20/outputs`.
@@ -16,7 +16,11 @@
 - Repository visibility verified PUBLIC: learner records, grades, workbook, teacher materials, and full prompts remain ignored/local. Only the sanitized addendum, ignore rule, and this ledger are tracked. No live learner database import or feature implementation performed in this attachment-addition step; these requirements remain pending, not verified features.
 - Validation: archive integrity/manifest/JSON/catalog checks, ignored-input and staged-file checks, `git diff --check`. Runtime code unchanged; the application verification below still applies to code a40b32e. Continue from the existing next action at the end of this ledger with the new requirements included.
 
-## Latest complete verification
+## Latest UI and Mac build verification
+
+[Apple Silicon run 40980907513](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40980907513), exact code e8e511e: **SUCCESS**, 8m5s. **197 passed, 2 skipped in 42.57s**; full production Next/TypeScript build; full eslint **0 errors, 0 warnings**; real interactions and persistence; six routes × two themes × five viewports, plus feedback/graph/reading states; mounted/relocated arm64 DMG; restart/deletion isolation; signature remains valid after use. The reviewed reading-paragraph regression and keyboard-focus failure are now GREEN. This is acceptance for the UI slice, not the entire handoff.
+
+## Prior foundation/native verification (historical a40b32e)
 [Apple Silicon run 40915353521](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40915353521), exact code a40b32e: **SUCCESS**, 8m34s. **197 passed, 2 skipped in 43.82s**; full Next/TypeScript build; eslint **0 errors, 1 warning**; real production browser journeys; mounted/relocated DMG; restart/deletion isolation; **post-use signature valid**.
 
 | Gate | Actual proof | Status and limit |
@@ -37,8 +41,8 @@
 | Manual Codemagic workflow | Python/Node Playwright, UI and lint gates, evidence export; YAML + six script blocks checked; existing checks 2 passed; manual M2 trigger retained | Config checked; Codemagic execution NOT RUN (no paid run) |
 
 ## Candidate and saved evidence
-- [Newest candidate DMG](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40915353521/artifacts/12916536305), archive 349,056,163 bytes, 14-day retention. Candidate only, ad-hoc signed.
-- [Browser evidence](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40915353521/artifacts/12916231705); [production web assets](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40915353521/artifacts/12916671126).
+- [Current UI candidate DMG](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40980907513/artifacts/12944937425), archive 348,613,119 bytes, 14-day retention; exact code e8e511e. Candidate only, ad-hoc signed.
+- [Current browser evidence](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40980907513/artifacts/12944484700); [current production web assets](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40980907513/artifacts/12944454828).
 - `outputs/TENET_STATUS.md`: this current checkpoint; Oct 28 `outputs/STATUS.md` is historical.
 - `outputs/tenet-ci-verification.log`, `tenet-source-tests.log`, `tenet-integration.patch`.
 - `outputs/Tenet-UI-Evidence/`: actual browser screenshots/accessibility trees/result; `result.json` identifies its exact run data.
@@ -65,7 +69,7 @@
 - New native signature failure observed RED on actual M1; Python import regression RED→GREEN. Signature valid after patched native launch/reopen/quit; shared CI adds final seal check. Python avoids bytecode; Next caches stay in memory (some warm-cache performance lost, no learner records lost).
 - Historical repairs: hidden Next announcer misclassified as app error; real proxy ECONNRESET fixed by disabling upstream keep-alive; SQLite test oracle fixed for actual hyphenated IDs; JSX/lint errors repaired; tooltip transition tested with bounded visibility wait.
 - Storage exhausted and produced real SQLite I/O failures, ENOSPC and LaunchServices -10810. Removed only owned generated caches/copies; space later recovered to 5.1 GiB and testing resumed. Source tests now pass; installed app/ordinary learner DBs were not replaced.
-- Deferred minor: lint warns the Solve effect omits query dependency. Parent is keyed by query and Back/query journey passes; make dependency explicit in a future verified UI slice. Also retain known CI Node-action/uv-cache annotations as maintenance work.
+- The UI slice resolves the old Solve hook-dependency warning; full lint now has zero warnings. CI Node-action/uv-cache annotations and the preexisting unused Swift log-seek result remain maintenance work.
 
 Rulings, in order:
 1. Ordinary isolated Git worktree after native tool rejected nested sourceRoot; cost: no automatic app-managed attachment.
@@ -82,7 +86,7 @@ Rulings, in order:
 ## Next single action
 Enable Accessibility for the controlling app, or run a controlled manual native sequence on the newest candidate: selected course → fresh unaided answer → hinted answer → diagnosis/repair → analytics → graceful quit/reopen, with OS external-network blocking and saved-event reconciliation. Then finish remaining product slices and distribution gates. Do not merge/publish as completed Tenet until all acceptance gates pass.
 
-## UI/UX Pro Max improvement slice — started October 29
+## UI/UX Pro Max improvement slice — verified October 29
 - User explicitly requested UI/UX Pro Max and clean light/dark switching on every page. Using installed `/Users/george/.agents/skills/ui-ux-pro-max/SKILL.md`, with the supplied GitHub repository checked. Design-system and UX searches saved in parent work/. Existing Next/React stack, Neutral Ink dark direction, five-item pill and Mac infrastructure remain governing; generated landing-page/React Native suggestions do not replace this application design.
 - Scope: semantic tokens and readable typography across six routes; complete white/light and Neutral Ink/dark appearances using existing next-themes provider; visible labels/focus and 44px controls; themed graphs/feedback; accurate autosave feedback; direct Home practice link; native appearance consistency. Full persisted StudyOS session engine and private learner import remain separate pending work.
 - Reproduced missing theme control against actual production app with disposable data: browser check FAILED as expected (0 controls, expected 1). Before screenshot and red log in `work/tenet-ui-polish/`.
@@ -96,3 +100,10 @@ Enable Accessibility for the controlling app, or run a controlled manual native 
 - Applying its shared UI principles within this authorized pass: a ~720px unboxed Solve reading column, 18px normal-weight preserved-paragraph stem, compact choices, optional reasoning/confidence disclosed on request, and one primary next action after grading. Existing backend provenance and stored reasoning/confidence are retained. Browser checks now open optional tools explicitly and cover real multiline Reading & Writing content in both themes.
 - Local checkpoint c1ca724 contains the common theme/keyboard/native-appearance work plus reviewed paragraph fix. Git transport briefly failed while API access recovered; an accidentally dispatched old-baseline workflow (40977612412 at 331a250) was cancelled and is not evidence for these changes. Push succeeded afterward. Final UI refinement and reading regression still require current-head production/Mac CI.
 - Current-code run [40979369608](https://github.com/codelagoon/SAT-adaptive-framework/actions/runs/40979369608) at c45861c built the production frontend and arm64 DMG and passed HTTP grading/restart/deletion checks, then failed the keyboard Escape-focus assertion before the new reading/theme matrix. The dropdown scheduled focus in the next animation frame, leaving a transient missing-focus state; returning focus synchronously removes that race and prevents a deferred callback from stealing subsequent focus. Full fresh verification required; this failed run is not acceptance evidence.
+
+- Final application run 40980907513 at e8e511e passes the complete configured Mac build/smoke/browser/lint workflow. Local source suite after the focus fix: **188 passed, 2 skipped in 4.19s**, excluding the nine preview-browser tests that pass in CI. The first local collection command excluded the wrong browser filename and failed for missing local Playwright; corrected exclusion matches prior local source runs. No source test failure was hidden.
+- Appearance choices use the existing system default until explicitly selected, then persist across reload/navigation. The Bible’s proposed dark default is not forced over an existing user preference. Native permission preflight remains Accessibility=false, screen capture=true; local Developer ID identities remain 0. Native window rendering/reopen verification for this UI build is being collected separately.
+
+- Current artifact evidence downloaded and CRC-checked after diagnosing stalled IPv6 downloads and resuming slow IPv4 transfers. Actual `result.json`: **PASS, 75 screenshots, five viewports, two themes, consoleErrors=[]**. Reading passages retain exact text and visible paragraph breaks in both themes. Representative Home/Solve/reading screenshots inspected; output: `outputs/Tenet-UX-Evidence/` and `outputs/tenet-ux-ci-verification.log`.
+
+- Actual M1 verification of the new shell reproduced a native startup failure despite HTTP 200: window 5967 showed the connection fallback. OS WebKit logs confirm main-frame provisional cancellation **NSURLErrorDomain -999** at startup, then the unconditional failure handler replaced the healthy navigation. Added a narrow cancellation guard; genuine connection errors retain the fallback. Evidence: parent `work/tenet-ui-polish/native-current.png` and `native-navigation.log`. e8e511e remains browser/build-verified but is superseded for native readiness; fresh native GREEN and full CI required.
