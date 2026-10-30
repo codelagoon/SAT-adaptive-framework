@@ -1,5 +1,6 @@
 import Cocoa
 import WebKit
+import UniformTypeIdentifiers
 
 @main
 final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScriptMessageHandler {
@@ -23,6 +24,7 @@ final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        configureMenus()
         let rect = NSRect(x: 0, y: 0, width: 1380, height: 900)
         window = NSWindow(contentRect: rect, styleMask: [.titled, .closable, .resizable, .miniaturizable],
                           backing: .buffered, defer: false)
@@ -41,6 +43,74 @@ final class MasteryApp: NSObject, NSApplicationDelegate, WKNavigationDelegate, W
         showWaiting("Starting your learning workspace…")
         startRuntime()
         checkServer()
+    }
+
+    private func configureMenus() {
+        let menu = NSMenu()
+        let appItem = NSMenuItem()
+        let appMenu = NSMenu(title:"Tenet")
+        appMenu.addItem(withTitle:"About Tenet", action:#selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent:"")
+        appMenu.addItem(.separator())
+        let downloads = appMenu.addItem(withTitle:"Get Updates…", action:#selector(getUpdates), keyEquivalent:"")
+        downloads.target = self
+        let install = appMenu.addItem(withTitle:"Install Update…", action:#selector(installUpdate), keyEquivalent:"")
+        install.target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle:"Hide Tenet", action:#selector(NSApplication.hide(_:)), keyEquivalent:"h")
+        appMenu.addItem(withTitle:"Quit Tenet", action:#selector(NSApplication.terminate(_:)), keyEquivalent:"q")
+        appItem.submenu = appMenu
+        menu.addItem(appItem)
+        let edit = NSMenu(title:"Edit")
+        for (title, action, key) in [("Undo", "undo:", "z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] {
+            edit.addItem(withTitle:title, action:Selector(action), keyEquivalent:key)
+        }
+        let editItem = NSMenuItem()
+        editItem.submenu = edit
+        menu.addItem(editItem)
+        NSApp.mainMenu = menu
+    }
+
+    @objc private func getUpdates() {
+        NSWorkspace.shared.open(URL(string:"https://github.com/codelagoon/SAT-adaptive-framework/actions/workflows/build-mac-dmg.yml?query=branch%3Acodex%2Ftenet-integrated")!)
+    }
+
+    @objc private func installUpdate() {
+        let picker = NSOpenPanel()
+        picker.title = "Install a Tenet update"
+        picker.message = "Choose the Tenet .dmg from a successful build in Get Updates. Unzip the download first. Your study progress is kept."
+        picker.prompt = "Install and Restart"
+        picker.allowedContentTypes = [.diskImage, .applicationBundle]
+        picker.allowsMultipleSelection = false
+        picker.treatsFilePackagesAsDirectories = false
+        guard picker.runModal() == .OK, let update = picker.url,
+              let resources = Bundle.main.resourceURL else {return}
+        do {
+            let job = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support/Tenet/InstallerJobs/\(UUID().uuidString)", isDirectory:true)
+            try FileManager.default.createDirectory(at:job, withIntermediateDirectories:true,
+                attributes:[.posixPermissions:0o700])
+            let helper = job.appendingPathComponent("install_tenet_update.py")
+            try FileManager.default.copyItem(at:resources.appendingPathComponent("install_tenet_update.py"), to:helper)
+            let logURL = job.appendingPathComponent("update.log")
+            FileManager.default.createFile(atPath:logURL.path, contents:nil, attributes:[.posixPermissions:0o600])
+            let log = try FileHandle(forWritingTo:logURL)
+            let task = Process()
+            task.executableURL = resources.appendingPathComponent("python/bin/python3.11")
+            task.arguments = [helper.path, update.path, Bundle.main.bundleURL.path,
+                "--wait-pid", String(ProcessInfo.processInfo.processIdentifier), "--interactive"]
+            var environment = ProcessInfo.processInfo.environment
+            environment["PYTHONDONTWRITEBYTECODE"] = "1"
+            task.environment = environment
+            task.standardOutput = log
+            task.standardError = log
+            try task.run()
+            NSApp.terminate(nil)
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "The update could not start"
+            alert.informativeText = "Your current app and study progress are unchanged. Try opening the update again."
+            alert.runModal()
+        }
     }
 
     private func showWaiting(_ message: String) {

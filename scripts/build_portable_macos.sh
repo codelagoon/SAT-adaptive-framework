@@ -106,17 +106,26 @@ Path(sys.argv[2]).write_text(src)
 PY
 cp "${SOURCE_DIR}/scripts/mastery_portable_launch.sh" "${RES}/mastery_launch.sh"
 cp "${SOURCE_DIR}/scripts/mac_e2e_smoke.sh" "${RES}/mac_e2e_smoke.sh"
+cp "${SOURCE_DIR}/scripts/install_tenet_update.py" "${RES}/install_tenet_update.py"
+"${RES}/python/bin/python3.11" - "${SOURCE_DIR}" "${RES}/tenet-build.json" <<'PY'
+import json, subprocess, sys
+from pathlib import Path
+source, output = sys.argv[1:]
+commit = subprocess.check_output(['git','-C',source,'rev-parse','HEAD'],text=True).strip()
+epoch = int(subprocess.check_output(['git','-C',source,'show','-s','--format=%ct','HEAD'],text=True).strip())
+Path(output).write_text(json.dumps({'schema':1,'source_commit':commit,'build_epoch':epoch,'channel':'integration'},indent=2))
+PY
 cat > "${APP}/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleExecutable</key><string>MasteryEngine2</string>
 <key>CFBundleIdentifier</key><string>app.masteryengine.mac</string>
-<key>CFBundleName</key><string>Mastery Engine 2</string>
-<key>CFBundleDisplayName</key><string>Mastery Engine 2</string>
+<key>CFBundleName</key><string>Tenet</string>
+<key>CFBundleDisplayName</key><string>Tenet</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.7.0</string>
-<key>CFBundleVersion</key><string>7</string>
+<key>CFBundleShortVersionString</key><string>0.8.0</string>
+<key>CFBundleVersion</key><string>8</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
