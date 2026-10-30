@@ -41,7 +41,7 @@ def make_app(path, epoch, bundle_id=installer.BUNDLE_ID):
         f = resources / relative
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_text('Disposable package fixture')
-        f.chmod(0o755)
+        f.chmod(0o755 if relative in ['node', 'python/bin/python3.11'] else 0o644)
     (resources / 'tenet-build.json').write_text(json.dumps({'source_commit': f'{epoch:040x}', 'build_epoch': epoch}))
     subprocess.run(['/usr/bin/codesign', '--force', '--deep', '--sign', '-', str(path)], check=True, capture_output=True)
     return path

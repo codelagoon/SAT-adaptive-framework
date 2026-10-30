@@ -34,10 +34,10 @@ def validate(app: Path, require_manifest=True):
     if 'arm64' not in run('/usr/bin/lipo', '-archs', app / 'Contents/MacOS/MasteryEngine2').stdout.split():
         raise ValueError('This update does not support Apple Silicon.')
     resources = app / 'Contents/Resources'
-    for relative in ['node', 'python/bin/python3.11', 'mastery_launch.sh']:
+    for relative in ['node', 'python/bin/python3.11']:
         if not os.access(resources / relative, os.X_OK):
             raise ValueError('The offline runtime is incomplete.')
-    for relative in ['opentutor/apps/web/.next/BUILD_ID', 'opentutor/apps/api/mastery_ext/router.py']:
+    for relative in ['mastery_launch.sh', 'opentutor/apps/web/.next/BUILD_ID', 'opentutor/apps/api/mastery_ext/router.py']:
         if not (resources / relative).is_file():
             raise ValueError('The learning workspace is incomplete.')
     manifest = resources / 'tenet-build.json'
