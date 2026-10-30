@@ -72,6 +72,8 @@ function keyFor(id) {
       assert.equal(await page.getByRole('navigation', { name: 'Study sections' }).isVisible(), false);
       const key = keyFor(item.id), answer = correct ? key : ['A', 'B', 'C', 'D'].find(k => k !== key);
       await page.locator(`input[type=radio][value="${answer}"]`).check();
+      assert.equal(await page.getByRole('textbox',{name:'Optional reasoning'}).isVisible(),false,'Optional reflection stays out of the answer flow');
+      await page.locator('summary').filter({hasText:'Reasoning & confidence'}).click();
       await page.getByRole('textbox', { name: 'Optional reasoning' }).fill('Tenet browser persistence check');
       await page.waitForTimeout(900);
       assert.equal((await api(`${prefix}/questions/${item.id}/draft`)).draft.response, answer);
@@ -96,6 +98,7 @@ function keyFor(id) {
           if(route.request().method()==='PUT'&&!held){held=true;announce();await hold}
           await route.continue();
         });
+        await page.locator('summary').filter({hasText:'Reasoning & confidence'}).click();
         await page.getByRole('textbox',{name:'Optional reasoning'}).fill('Draft held across submit boundary');
         await observed;
         let quizSent=false;
