@@ -85,7 +85,7 @@ function PremiumSelect({value,options,onChange,label,className="",disabled=false
   items?.[Math.max(0,Math.min(items.length-1,index))]?.focus();
  };
  useLayoutEffect(()=>{if(open)focusOption(selectedIndex)},[open,selectedIndex]);
- function close(){setOpen(false);requestAnimationFrame(()=>button.current?.focus())}
+ function close(){setOpen(false);button.current?.focus()}
  function keyDown(ev:KeyboardEvent){
   if(ev.key==="Escape"&&open){ev.preventDefault();close();return}
   if(ev.key==="Tab"&&open){setOpen(false);button.current?.focus();return}
